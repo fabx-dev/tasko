@@ -52,6 +52,27 @@ except ImportError:  # esecuzione come script: python src/main.py
         set_lang,
     )
 
+try:
+    from src import crypto as _crypto
+except ImportError:  # esecuzione come script: python src/main.py
+    import crypto as _crypto
+
+
+def _read_state_file(path: Path):
+    """Legge JSON con envelope cifrato opzionale.
+
+    Solleva ValueError se il file e' cifrato e la password manca/errata,
+    o se il contenuto non e' JSON valido.
+    """
+    text = path.read_text(encoding="utf-8")  # OSError se manca
+    obj, _ = _crypto.unprotect_text(text)
+    return obj
+
+
+def _dump_state_text(obj) -> str:
+    """Serializza JSON applicando la cifratura se il lock e' attivo."""
+    return _crypto.protect_text(json.dumps(obj, indent=2, ensure_ascii=False))
+
 
 def _apply_startup_lang() -> str:
     """Legge TASKO_LANG/config e imposta la lingua PRIMA delle classi (BINDINGS fissi)."""
@@ -388,9 +409,8 @@ def load_todos() -> list[TodoItem]:
     if not DATA_FILE.exists():
         return []
     try:
-        with open(DATA_FILE, encoding="utf-8") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError):
+        data = _read_state_file(DATA_FILE)
+    except (json.JSONDecodeError, OSError, ValueError):
         backup = DATA_FILE.with_suffix(".corrotto.json")
         try:
             backup.write_bytes(DATA_FILE.read_bytes())
@@ -416,7 +436,7 @@ def save_todos(todos: list[TodoItem]) -> None:
 
     tmp = DATA_FILE.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump([t.to_dict() for t in todos], f, indent=2, ensure_ascii=False)
+        f.write(_dump_state_text([t.to_dict() for t in todos]))
         f.flush()
         try:
             os.fsync(f.fileno())
@@ -949,8 +969,8 @@ def load_templates() -> dict[str, list[dict]]:
             for k, v in DEFAULT_TEMPLATES.items()
         }
     try:
-        data = json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        data = _read_state_file(TEMPLATE_FILE)
+    except (json.JSONDecodeError, OSError, ValueError):
         return {
             k: [{"title": i["title"], "priority": i["priority"]} for i in v]
             for k, v in DEFAULT_TEMPLATES.items()
@@ -996,7 +1016,7 @@ def save_templates(templates: dict[str, list[dict]]) -> None:
     }
     tmp = TEMPLATE_FILE.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(serializable, f, indent=2, ensure_ascii=False)
+        f.write(_dump_state_text(serializable))
         f.flush()
         try:
             os.fsync(f.fileno())
@@ -1094,8 +1114,8 @@ def load_archive() -> list[dict]:
     if not ARCHIVE_FILE.exists():
         return []
     try:
-        data = json.loads(ARCHIVE_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        data = _read_state_file(ARCHIVE_FILE)
+    except (json.JSONDecodeError, OSError, ValueError):
         return []
     return [d for d in data] if isinstance(data, list) else []
 
@@ -1105,7 +1125,7 @@ def save_archive(items: list[dict]) -> None:
 
     tmp = ARCHIVE_FILE.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(items, f, indent=2, ensure_ascii=False)
+        f.write(_dump_state_text(items))
         f.flush()
         try:
             os.fsync(f.fileno())
@@ -1257,8 +1277,8 @@ def load_pomodoro() -> dict:
     if not POMODORO_FILE.exists():
         return cfg
     try:
-        data = json.loads(POMODORO_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        data = _read_state_file(POMODORO_FILE)
+    except (json.JSONDecodeError, OSError, ValueError):
         return cfg
     if not isinstance(data, dict):
         return cfg
@@ -1290,7 +1310,7 @@ def save_pomodoro(state: dict) -> None:
     }
     tmp = POMODORO_FILE.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False)
+        f.write(_dump_state_text(payload))
         f.flush()
         try:
             os.fsync(f.fileno())
@@ -4067,12 +4087,318 @@ class WelcomeScreen(ModalScreen[str | None]):
         self.dismiss("empty")
 
 
+def _needs_unlock() -> bool:
+    """True se almeno un file dati e' cifrato."""
+    for name, path in _backup_sources():
+        if name == "config":
+            continue
+        try:
+            if path.exists() and _crypto.is_envelope(path.read_text(encoding="utf-8")):
+                return True
+        except OSError:
+            pass
+    return False
+
+
+class LockScreen(ModalScreen[bool]):
+    """Blocco password all'avvio (solo se dati cifrati)."""
+
+    CSS = """
+    LockScreen {
+        align: center middle;
+    }
+    #lock-box {
+        width: 52;
+        max-width: 90%;
+        height: auto;
+        border: thick $warning;
+        background: $surface;
+        padding: 1 2;
+    }
+    #lock-title {
+        text-align: center;
+        text-style: bold;
+        color: $warning;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #lock-hint {
+        text-align: center;
+        color: $text-muted;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #lock-pw {
+        margin-bottom: 1;
+    }
+    #lock-buttons {
+        width: 100%;
+        height: 3;
+    }
+    #lock-buttons Button {
+        width: 1fr;
+        min-width: 14;
+        height: 3;
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "abort", "Esci")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="lock-box"):
+            yield Label("[b]🔒 Tasko protetto[/b]", id="lock-title")
+            yield Label(T("lock_hint"), id="lock-hint")
+            yield Input(placeholder="Password", password=True, id="lock-pw")
+            with Horizontal(id="lock-buttons"):
+                yield Button(T("lock_open"), id="lock-ok", variant="default")
+                yield Button(T("lock_exit"), id="lock-exit", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#lock-pw", Input).focus()
+        except Exception:
+            pass
+
+    def action_abort(self) -> None:
+        self.dismiss(False)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "lock-exit":
+            self.dismiss(False)
+        elif event.button.id == "lock-ok":
+            self._submit()
+
+    def _submit(self) -> None:
+        pw_input = self.query_one("#lock-pw", Input)
+        password = pw_input.value
+        if not password:
+            pw_input.focus()
+            return
+        ok = True
+        for name, path in _backup_sources():
+            if name == "config":
+                continue
+            try:
+                if path.exists() and not _crypto.try_password(password, path):
+                    ok = False
+                    break
+            except OSError:
+                pass
+        if not ok:
+            pw_input.value = ""
+            pw_input.disabled = True
+            self.notify(T("n_lock_bad"), severity="error")
+            self.set_timer(1.0, self._reenable)
+            return
+        _crypto.set_key(_crypto.password_to_key(password))
+        self.dismiss(True)
+
+    def _reenable(self) -> None:
+        try:
+            pw_input = self.query_one("#lock-pw", Input)
+            pw_input.disabled = False
+            pw_input.focus()
+        except Exception:
+            pass
+
+
+class PasswordScreen(ModalScreen[list[str] | None]):
+    """Raccoglie 1-3 password (niente logica: valida il chiamante)."""
+
+    CSS = """
+    PasswordScreen {
+        align: center middle;
+    }
+    #pw-box {
+        width: 52;
+        max-width: 90%;
+        height: auto;
+        border: thick $primary;
+        background: $surface;
+        padding: 1 2;
+    }
+    #pw-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #pw-box Input {
+        margin-bottom: 1;
+    }
+    #pw-box Label {
+        margin-bottom: 0;
+    }
+    #pw-buttons {
+        width: 100%;
+        height: 3;
+        margin-top: 1;
+    }
+    #pw-buttons Button {
+        width: 1fr;
+        min-width: 14;
+        height: 3;
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Annulla"),
+        Binding("ctrl+enter", "submit", "Conferma", show=False),
+    ]
+
+    def __init__(self, title_key: str, fields: list[str], validate=None) -> None:
+        super().__init__()
+        self.title_key = title_key
+        self.fields = fields
+        self._validate = validate
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="pw-box"):
+            yield Label(T(self.title_key), id="pw-title")
+            with Vertical(id="pw-body"):
+                for i, label_key in enumerate(self.fields):
+                    yield Label(T(label_key))
+                    yield Input(password=True, id=f"pw-{i}")
+            with Horizontal(id="pw-buttons"):
+                yield Button(T("form_save"), id="pw-ok", variant="default")
+                yield Button(T("form_cancel"), id="pw-cancel", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#pw-0", Input).focus()
+        except Exception:
+            pass
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_submit(self) -> None:
+        self._submit()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "pw-cancel":
+            self.dismiss(None)
+        elif event.button.id == "pw-ok":
+            self._submit()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self._submit()
+
+    def _submit(self) -> None:
+        try:
+            values = [
+                self.query_one(f"#pw-{i}", Input).value for i in range(len(self.fields))
+            ]
+        except Exception:
+            return
+        if self._validate is not None:
+            err = self._validate(values)
+            if err:
+                self.notify(err, severity="error")
+                try:
+                    self.query_one("#pw-0", Input).focus()
+                except Exception:
+                    pass
+                return
+        self.dismiss(values)
+
+
+class SecurityScreen(ModalScreen[str | None]):
+    """Stato cifratura + azioni (dismiss 'enable'/'change'/'disable'/None)."""
+
+    CSS = """
+    SecurityScreen {
+        align: center middle;
+    }
+    #sec-box {
+        width: 56;
+        max-width: 92%;
+        height: auto;
+        border: thick $primary;
+        background: $surface;
+        padding: 1 2;
+    }
+    #sec-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #sec-status {
+        text-align: center;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #sec-hint {
+        text-align: center;
+        color: $text-muted;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #sec-buttons {
+        width: 100%;
+        height: auto;
+    }
+    #sec-buttons Button {
+        width: 100%;
+        min-width: 0;
+        height: 3;
+        margin-bottom: 1;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "close", "Chiudi")]
+
+    def __init__(self, enabled: bool) -> None:
+        super().__init__()
+        self.enabled = enabled
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="sec-box"):
+            yield Label(T("sec_title"), id="sec-title")
+            yield Label(T("sec_on") if self.enabled else T("sec_off"), id="sec-status")
+            yield Label(T("sec_hint"), id="sec-hint")
+            with Vertical(id="sec-buttons"):
+                if self.enabled:
+                    yield Button(T("sec_change"), id="sec-change", variant="default")
+                    yield Button(T("sec_disable"), id="sec-disable", variant="default")
+                else:
+                    yield Button(T("sec_enable"), id="sec-enable", variant="default")
+                yield Button(T("ui_close_esc"), id="sec-close", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            first = self.query("#sec-buttons Button")
+            if first:
+                first.first().focus()
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id or ""
+        if bid == "sec-close":
+            self.dismiss(None)
+        elif bid in ("sec-enable", "sec-change", "sec-disable"):
+            self.dismiss(bid[len("sec-") :])
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+
 class TaskoMenuProvider(Provider):
     """Voci del menu principale (m): solo configurazione, import/export e utility senza tasto."""
 
     # (titolo, aiuto, nome action di TodoApp)
     MENU_IT: tuple[tuple[str, str, str], ...] = (
         (T("menu_settings_t"), T("menu_settings_h"), "action_open_settings"),
+        (T("menu_security_t"), T("menu_security_h"), "action_open_security"),
         (T("menu_goals_t"), T("menu_goals_h"), "action_edit_goals"),
         (T("menu_clearf_t"), T("menu_clearf_h"), "action_clear_filters"),
         (T("menu_backup_now_t"), T("menu_backup_now_h"), "action_backup_now"),
@@ -4369,8 +4695,24 @@ class TodoApp(App):
         except Exception:
             pass
         self._populate_table()
-        self._restore_pomodoro()
-        self._auto_backup()
+        if _needs_unlock() and not _crypto.is_unlocked():
+            self.push_screen(LockScreen(), self._on_unlocked)
+            return
+        self._continue_startup(reload=False)
+
+    def _on_unlocked(self, ok: bool | None) -> None:
+        if not ok:
+            self.exit()
+            return
+        self._continue_startup(reload=True)
+
+    def _continue_startup(self, reload: bool) -> None:
+        if reload:
+            self._reload_all()
+        else:
+            self._pending_pomo = load_pomodoro()
+            self._restore_pomodoro()
+            self._auto_backup()
         if not self.todos:
             self.query_one("#help-panel").remove_class("hidden")
             if not self.config.get("onboarded"):
@@ -5991,6 +6333,13 @@ class TodoApp(App):
                 except Exception as exc:
                     self.notify(T("n_restore_fail", e=exc), severity="error")
                     return
+                try:
+                    _read_state_file(DATA_FILE)
+                except ValueError:
+                    self.notify(T("n_restore_badkey"), severity="error")
+                    return
+                except OSError:
+                    pass
                 self._reload_all()
                 self.notify(T("n_restored_snap", d=info.get("created", "?")))
 
@@ -6026,6 +6375,7 @@ class TodoApp(App):
         else:
             self._update_pomodoro_bar()
         self._populate_table()
+        self._auto_backup()
 
     def _auto_backup(self) -> None:
         try:
@@ -6040,6 +6390,142 @@ class TodoApp(App):
             self.notify(T("n_auto_bak", n=path.name))
         except Exception:
             pass
+
+    def action_open_security(self) -> None:
+        self.push_screen(SecurityScreen(_needs_unlock()), self._on_security_action)
+
+    def _on_security_action(self, action: str | None) -> None:
+        if action == "enable":
+            self.push_screen(
+                PasswordScreen(
+                    "sec_pw_title_enable",
+                    ["sec_pw_new", "sec_pw_repeat"],
+                    self._pw_valid_new,
+                ),
+                self._sec_enable,
+            )
+        elif action == "change":
+            self.push_screen(
+                PasswordScreen(
+                    "sec_pw_title_change",
+                    ["sec_pw_current", "sec_pw_new", "sec_pw_repeat"],
+                    self._pw_valid_change,
+                ),
+                self._sec_change,
+            )
+        elif action == "disable":
+            self.push_screen(
+                PasswordScreen(
+                    "sec_pw_title_disable", ["sec_pw_current"], self._pw_valid_disable
+                ),
+                self._sec_disable,
+            )
+
+    def _pw_valid_new(self, values: list[str]) -> str | None:
+        if any(not v for v in values):
+            return T("n_sec_fill")
+        new, repeat = values[-2], values[-1]
+        if len(new) < 8:
+            return T("n_sec_need8")
+        if new != repeat:
+            return T("n_sec_mismatch")
+        return None
+
+    def _pw_valid_change(self, values: list[str]) -> str | None:
+        if any(not v for v in values):
+            return T("n_sec_fill")
+        if not self._sec_current_ok(values[0]):
+            return T("n_sec_badcurrent")
+        return self._pw_valid_new(values[1:])
+
+    def _pw_valid_disable(self, values: list[str]) -> str | None:
+        if any(not v for v in values):
+            return T("n_sec_fill")
+        if not self._sec_current_ok(values[0]):
+            return T("n_sec_badcurrent")
+        return None
+
+    def _rewrite_all_state(self) -> None:
+        self._save_data()
+        save_templates(self.templates)
+        self._save_pomodoro()
+        try:
+            save_archive(load_archive())
+        except Exception:
+            pass
+
+    def _sec_enable(self, values: list[str] | None) -> None:
+        if not values:
+            return
+        new, repeat = values[0], values[1]
+        if len(new) < 8:
+            self.notify(T("n_sec_need8"), severity="error")
+            return
+        if new != repeat:
+            self.notify(T("n_sec_mismatch"), severity="error")
+            return
+        try:
+            create_backup()
+        except Exception as exc:
+            self.notify(T("n_bak_fail", e=exc), severity="error")
+            return
+        _crypto.set_key(_crypto.password_to_key(new))
+        try:
+            self._rewrite_all_state()
+        except Exception as exc:
+            _crypto.set_key(None)
+            self.notify(T("n_bak_fail", e=exc), severity="error")
+            return
+        self._populate_table()
+        self.notify(T("n_sec_enabled"))
+
+    def _sec_current_ok(self, password: str) -> bool:
+        for name, path in _backup_sources():
+            if name == "config":
+                continue
+            try:
+                if path.exists() and not _crypto.try_password(password, path):
+                    return False
+            except OSError:
+                pass
+        return True
+
+    def _sec_change(self, values: list[str] | None) -> None:
+        if not values:
+            return
+        old, new, repeat = values[0], values[1], values[2]
+        if not self._sec_current_ok(old):
+            self.notify(T("n_sec_badcurrent"), severity="error")
+            return
+        if len(new) < 8:
+            self.notify(T("n_sec_need8"), severity="error")
+            return
+        if new != repeat:
+            self.notify(T("n_sec_mismatch"), severity="error")
+            return
+        _crypto.set_key(_crypto.password_to_key(new))
+        try:
+            self._rewrite_all_state()
+        except Exception as exc:
+            self.notify(T("n_bak_fail", e=exc), severity="error")
+            return
+        self._populate_table()
+        self.notify(T("n_sec_changed"))
+
+    def _sec_disable(self, values: list[str] | None) -> None:
+        if not values:
+            return
+        if not self._sec_current_ok(values[0]):
+            self.notify(T("n_sec_badcurrent"), severity="error")
+            return
+        _crypto.set_key(None)
+        try:
+            self._rewrite_all_state()
+        except Exception as exc:
+            self.notify(T("n_bak_fail", e=exc), severity="error")
+            return
+        self._populate_table()
+        self.notify(T("n_sec_disabled"))
 
     def action_refresh(self) -> None:
         self._reload_all()
