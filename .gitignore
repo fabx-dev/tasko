@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+# Ambienti virtuali
+.venv/
+venv/
+# Dati locali (mai nel repo)
+*.json
+# Screenshot/export locali
+Tasko_screenshots/
+Tasko_backups/
+# Sistema
+.DS_Store

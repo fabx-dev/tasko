@@ -1,0 +1,8 @@
+# Baseline lint: regole sicure e meccaniche.
+# Escluse di proposito (pattern intenzionali del progetto):
+# - BLE/S110/S112: l'UI non deve mai andare in crash -> except ampi/pass voluti
+# - DTZ: il formato file usa datetime wall-time "YYYY-MM-DD HH:MM" (aware romperebbe i dati)
+# - RUF012: BINDINGS/CSS devono restare attributi di classe semplici (richiesto da Textual)
+[lint]
+select = ["E", "F", "I", "UP045", "PIE794"]
+ignore = ["E501"]
