@@ -5,9 +5,9 @@ WORKDIR /workspace
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
 
-CMD ["python", "src/main.py"]
+RUN pip install --no-cache-dir .
+
+CMD ["tasko"]

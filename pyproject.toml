@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tasko"
+version = "0.1.0"
+description = "TUI todo list in italiano e inglese: kanban, pomodoro a cicli, statistiche, backup"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = ["textual>=0.86.0,<4.0.0"]
+
+[project.scripts]
+tasko = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
