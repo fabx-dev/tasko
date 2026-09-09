@@ -21,15 +21,24 @@ def detect_system_lang() -> str:
     Se il locale e' indeterminato (C/POSIX/vuoto) ritorna 'it'
     per non cambiare lingua agli utenti esistenti.
     """
+    import os
+
     try:
-        raw = " ".join(
-            x for x in (locale.getlocale()[0], locale.getdefaultlocale()[0]) if x
-        )
+        loc = locale.getlocale()[0] or ""
     except Exception:
+        loc = ""
+    env = " ".join(
+        x
+        for x in (
+            loc,
+            os.environ.get("LC_ALL", ""),
+            os.environ.get("LANG", ""),
+        )
+        if x
+    )
+    if not env or env.upper().startswith(("C.", "C ", "POSIX")):
         return "it"
-    if not raw or raw.upper().startswith(("C.", "POSIX")):
-        return "it"
-    low = raw.lower()
+    low = env.lower()
     if "italian" in low or low.startswith("it") or "_it" in low:
         return "it"
     return "en"

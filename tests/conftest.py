@@ -15,14 +15,36 @@ import src.main as main  # noqa: E402
 
 @pytest.fixture(scope="session", autouse=True)
 def _italian_module():
-    """Riesegue src.main con lingua italiana: BINDINGS deterministici su ogni macchina."""
+    """Riesegue src.main con lingua italiana FORZATA (TASKO_LANG vince su
+    config reale e locale di macchina): BINDINGS deterministici ovunque."""
     import importlib
+    import os
 
+    os.environ["TASKO_LANG"] = "it"
     lang.set_lang("it")
     importlib.reload(main)
     lang.set_lang("it")
     yield
     lang.set_lang("it")
+    os.environ.pop("TASKO_LANG", None)
+
+
+def screen_texts(screen) -> str:
+    """Testo di tutti gli Static ESATTI (Label esclusa).
+
+    Compatibile con Textual 8.x (.content) e 3.x (.renderable).
+    """
+    from textual.widgets import Static
+
+    out = []
+    for w in screen.query("Static"):
+        if type(w) is not Static:
+            continue
+        content = getattr(w, "content", None)
+        if content is None:
+            content = getattr(w, "renderable", "")
+        out.append(str(content))
+    return " ".join(out)
 
 
 @pytest.fixture()

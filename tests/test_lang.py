@@ -41,14 +41,18 @@ def test_detect(monkeypatch):
     import locale as _locale
 
     monkeypatch.setattr(_locale, "getlocale", lambda: ("it_IT", "UTF-8"))
-    monkeypatch.setattr(_locale, "getdefaultlocale", lambda: ("it_IT", "UTF-8"))
+    monkeypatch.setenv("LC_ALL", "")
+    monkeypatch.setenv("LANG", "")
     assert lang.detect_system_lang() == "it"
     monkeypatch.setattr(_locale, "getlocale", lambda: ("en_US", "UTF-8"))
-    monkeypatch.setattr(_locale, "getdefaultlocale", lambda: ("en_US", "UTF-8"))
     assert lang.detect_system_lang() == "en"
     monkeypatch.setattr(_locale, "getlocale", lambda: (None, None))
-    monkeypatch.setattr(_locale, "getdefaultlocale", lambda: (None, None))
     assert lang.detect_system_lang() == "it"
+    monkeypatch.setenv("LANG", "it_IT.UTF-8")
+    assert lang.detect_system_lang() == "it"
+    monkeypatch.setenv("LANG", "fr_FR.UTF-8")
+    monkeypatch.setattr(_locale, "getlocale", lambda: (None, None))
+    assert lang.detect_system_lang() == "en"
 
 
 def test_date_helpers(italian_lang):

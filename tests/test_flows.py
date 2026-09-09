@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from textual.widgets import Input
 
 import src.main as m
-from tests.conftest import make_app, make_todo
+from tests.conftest import make_app, make_todo, screen_texts
 
 
 def run(coro):
@@ -226,7 +226,7 @@ def test_stats_conteggi_e_streak(tmp_files):
             await pilot.pause()
             await pilot.pause()
             assert type(app.screen).__name__ == "StatsScreen"
-            content = " ".join(str(x.content) for x in app.screen.query("Static"))
+            content = screen_texts(app.screen)
             assert "Serie:" in content and "Obiettivo oggi:" in content
             await pilot.press("escape")
             await pilot.pause()
