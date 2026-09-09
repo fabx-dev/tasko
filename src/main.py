@@ -4548,20 +4548,12 @@ class TodoApp(App):
     COMMANDS = App.COMMANDS | {TaskoMenuProvider}
 
     def get_system_commands(self, screen: Screen):
-        """Comandi di sistema della palette, localizzati."""
+        """Comandi di sistema della palette, localizzati (senza ingrandisci: inutile qui)."""
         yield SystemCommand(
             T("sys_theme_t"), T("sys_theme_h"), self.action_choose_theme
         )
         yield SystemCommand(T("sys_quit_t"), T("sys_quit_h"), self.action_quit)
         yield SystemCommand(T("sys_keys_t"), T("sys_keys_h"), self.action_show_keys)
-        if screen.maximized is not None:
-            yield SystemCommand(
-                T("sys_zoom_out_t"), T("sys_zoom_out_h"), screen.action_minimize
-            )
-        elif screen.focused is not None and screen.focused.allow_maximize:
-            yield SystemCommand(
-                T("sys_zoom_in_t"), T("sys_zoom_in_h"), screen.action_maximize
-            )
         yield SystemCommand(
             T("sys_snap_t"),
             T("sys_snap_h"),
