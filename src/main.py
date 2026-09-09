@@ -1017,6 +1017,7 @@ DEFAULT_CONFIG: dict = {
     "weekly_goal": 25,
     "pomo_daily_goal": 8,
     "lang": "auto",
+    "onboarded": False,
 }
 FILTER_STATES = ("attivo", "in_sospeso", "completati", None)
 
@@ -1035,7 +1036,7 @@ def load_config() -> dict:
         cfg["theme"] = data["theme"].strip()
     if isinstance(data.get("kanban_visible"), bool):
         cfg["kanban_visible"] = data["kanban_visible"]
-    if data.get("filter_state") in FILTER_STATES:
+    if "filter_state" in data and data["filter_state"] in FILTER_STATES:
         cfg["filter_state"] = data["filter_state"]
     try:
         daily = int(data.get("daily_goal", 5))
@@ -1054,6 +1055,7 @@ def load_config() -> dict:
         cfg["pomo_daily_goal"] = 8
     lang = str(data.get("lang", "auto")).lower()
     cfg["lang"] = lang if lang in ("auto", "it", "en") else "auto"
+    cfg["onboarded"] = bool(data.get("onboarded", False))
     return cfg
 
 
@@ -1069,6 +1071,7 @@ def save_config(cfg: dict) -> None:
         "daily_goal": _clamp_int(cfg.get("daily_goal", 5), 5, 0, 100),
         "weekly_goal": _clamp_int(cfg.get("weekly_goal", 25), 25, 0, 500),
         "pomo_daily_goal": _clamp_int(cfg.get("pomo_daily_goal", 8), 8, 0, 100),
+        "onboarded": bool(cfg.get("onboarded", False)),
         "lang": str(cfg.get("lang", "auto")).lower()
         if str(cfg.get("lang", "auto")).lower() in ("auto", "it", "en")
         else "auto",
@@ -3943,6 +3946,127 @@ class RestoreScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+def _demo_todos(start_id: int = 1) -> list[TodoItem]:
+    """Dati di esempio con date relative a oggi (onboarding)."""
+    today = datetime.now().date()
+
+    def iso(offset: int) -> str:
+        return (today + timedelta(days=offset)).strftime("%Y-%m-%d")
+
+    nid = start_id
+    items: list[TodoItem] = []
+
+    def add(**kw) -> TodoItem:
+        nonlocal nid
+        t = TodoItem(todo_id=nid, **kw)
+        nid += 1
+        items.append(t)
+        return t
+
+    padre = add(
+        title="Preventivo cliente Acme",
+        priority=Priority.HIGH,
+        due=iso(2),
+        project="acme",
+        tags=["preventivo"],
+        notes="- [ ] Voce manodopera\n- [ ] Voce materiali",
+        stima_pomo=4,
+    )
+    add(
+        title="Raccogli requisiti",
+        priority=Priority.MEDIUM,
+        parent_id=padre.id,
+        project="acme",
+    )
+    add(
+        title="Sopralluogo",
+        priority=Priority.MEDIUM,
+        due=iso(1),
+        parent_id=padre.id,
+        project="acme",
+    )
+    add(
+        title="Chiamare Banca",
+        priority=Priority.MEDIUM,
+        due=iso(0),
+        project="personale",
+        tags=["call"],
+    )
+    add(title="Spesa settimanale", priority=Priority.LOW, due=iso(5))
+    add(
+        title="Leggere report",
+        priority=Priority.LOW,
+        done=True,
+        completed_at=(today - timedelta(days=1)).strftime("%Y-%m-%d") + " 18:00",
+    )
+    return items
+
+
+class WelcomeScreen(ModalScreen[str | None]):
+    """Benvenuto con scelta demo/vuoto (solo al primo avvio senza task)."""
+
+    CSS = """
+    WelcomeScreen {
+        align: center middle;
+    }
+    #wel-box {
+        width: 60;
+        max-width: 92%;
+        height: auto;
+        border: thick $primary;
+        background: $surface;
+        padding: 1 2;
+    }
+    #wel-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #wel-body {
+        text-align: center;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #wel-buttons {
+        width: 100%;
+        height: 3;
+    }
+    #wel-buttons Button {
+        width: 1fr;
+        min-width: 14;
+        height: 3;
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "empty", "Vuoto")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="wel-box"):
+            yield Label(T("welcome_title"), id="wel-title")
+            yield Label(T("welcome_body"), id="wel-body")
+            with Horizontal(id="wel-buttons"):
+                yield Button(T("welcome_demo"), id="wel-demo", variant="default")
+                yield Button(T("welcome_empty"), id="wel-empty", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#wel-demo", Button).focus()
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "wel-empty":
+            self.dismiss("empty")
+        elif event.button.id == "wel-demo":
+            self.dismiss("demo")
+
+    def action_empty(self) -> None:
+        self.dismiss("empty")
+
+
 class TaskoMenuProvider(Provider):
     """Voci del menu principale (m): solo configurazione, import/export e utility senza tasto."""
 
@@ -4249,6 +4373,21 @@ class TodoApp(App):
         self._auto_backup()
         if not self.todos:
             self.query_one("#help-panel").remove_class("hidden")
+            if not self.config.get("onboarded"):
+                self.push_screen(WelcomeScreen(), self._on_welcome)
+            else:
+                self.notify(T("n_welcome"))
+
+    def _on_welcome(self, choice: str | None) -> None:
+        self.config["onboarded"] = True
+        self._save_config()
+        if choice == "demo":
+            self.todos = _demo_todos(self.next_id)
+            self.next_id = max((t.id or 0 for t in self.todos), default=0) + 1
+            self._save_data()
+            self._populate_table()
+            self.notify(T("n_welcome_demo"))
+        else:
             self.notify(T("n_welcome"))
 
     def _help_text(self) -> str:
