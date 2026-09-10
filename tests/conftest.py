@@ -47,9 +47,9 @@ def screen_texts(screen) -> str:
     return " ".join(out)
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def tmp_files(tmp_path, monkeypatch):
-    """Redireziona ogni path su file temporanei e ricarica i default."""
+    """AUTOUSE: redireziona ogni path su file temporanei (mai ~/.todo_* nei test)."""
     monkeypatch.setattr(main, "DATA_FILE", tmp_path / "todo.json")
     monkeypatch.setattr(main, "TEMPLATE_FILE", tmp_path / "templates.json")
     monkeypatch.setattr(main, "POMODORO_FILE", tmp_path / "pomo.json")

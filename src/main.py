@@ -1038,6 +1038,8 @@ DEFAULT_CONFIG: dict = {
     "pomo_daily_goal": 8,
     "lang": "auto",
     "onboarded": False,
+    "reminder_min": 10,
+    "sounds": True,
 }
 FILTER_STATES = ("attivo", "in_sospeso", "completati", None)
 
@@ -1076,6 +1078,12 @@ def load_config() -> dict:
     lang = str(data.get("lang", "auto")).lower()
     cfg["lang"] = lang if lang in ("auto", "it", "en") else "auto"
     cfg["onboarded"] = bool(data.get("onboarded", False))
+    try:
+        rem = int(data.get("reminder_min", 10))
+        cfg["reminder_min"] = rem if 0 <= rem <= 120 else 10
+    except (ValueError, TypeError):
+        cfg["reminder_min"] = 10
+    cfg["sounds"] = bool(data.get("sounds", True))
     return cfg
 
 
@@ -1092,6 +1100,8 @@ def save_config(cfg: dict) -> None:
         "weekly_goal": _clamp_int(cfg.get("weekly_goal", 25), 25, 0, 500),
         "pomo_daily_goal": _clamp_int(cfg.get("pomo_daily_goal", 8), 8, 0, 100),
         "onboarded": bool(cfg.get("onboarded", False)),
+        "reminder_min": _clamp_int(cfg.get("reminder_min", 10), 10, 0, 120),
+        "sounds": bool(cfg.get("sounds", True)),
         "lang": str(cfg.get("lang", "auto")).lower()
         if str(cfg.get("lang", "auto")).lower() in ("auto", "it", "en")
         else "auto",
@@ -3723,6 +3733,16 @@ class SettingsScreen(ModalScreen[dict | None]):
                 yield Input(str(self.current.get("long_min", 15)), id="set-long")
                 yield Label(T("set_every"))
                 yield Input(str(self.current.get("long_every", 4)), id="set-every")
+                yield Label(T("set_reminder"))
+                yield Input(
+                    str(self.current.get("reminder_min", 10)), id="set-reminder"
+                )
+                yield Label(T("set_sounds"))
+                yield Select(
+                    [(T("set_yes"), True), (T("set_no"), False)],
+                    value=bool(self.current.get("sounds", True)),
+                    id="set-sounds",
+                )
             with Horizontal(id="set-buttons"):
                 yield Button(T("form_save"), id="set-save", variant="default")
                 yield Button(T("form_cancel"), id="set-cancel", variant="default")
@@ -3770,7 +3790,9 @@ class SettingsScreen(ModalScreen[dict | None]):
         short = self._num("set-short", 1, 60)
         longm = self._num("set-long", 1, 60)
         every = self._num("set-every", 2, 12)
-        if None in (daily, weekly, pomo, focus, short, longm, every):
+        reminder = self._num("set-reminder", 0, 120)
+        sounds = self.query_one("#set-sounds", Select).value
+        if None in (daily, weekly, pomo, focus, short, longm, every, reminder):
             return
         self.dismiss(
             {
@@ -3785,6 +3807,8 @@ class SettingsScreen(ModalScreen[dict | None]):
                 "long_min": longm,
                 "long_every": every,
                 "lang": lang if lang in ("auto", "it", "en") else "auto",
+                "reminder_min": reminder,
+                "sounds": bool(sounds),
             }
         )
 
@@ -4613,6 +4637,7 @@ class TodoApp(App):
         self._row_map: list[TodoItem] = []
         self._undo_stack: list[list[TodoItem]] = []
         self._trash: list[TodoItem] = []
+        self._reminded: set[tuple] = set()
         self.focus_task_id: int | None = None
         self.focus_end: datetime | None = None
         self.focus_paused_secs: int | None = None
@@ -4686,6 +4711,10 @@ class TodoApp(App):
             self.set_interval(1, self._tick_focus)
         except Exception:
             pass
+        try:
+            self.set_interval(30, self._check_reminders)
+        except Exception:
+            pass
         self._populate_table()
         if _needs_unlock() and not _crypto.is_unlocked():
             self.push_screen(LockScreen(), self._on_unlocked)
@@ -4711,6 +4740,10 @@ class TodoApp(App):
                 self.push_screen(WelcomeScreen(), self._on_welcome)
             else:
                 self.notify(T("n_welcome"))
+        try:
+            self._check_reminders()
+        except Exception:
+            pass
 
     def _on_welcome(self, choice: str | None) -> None:
         self.config["onboarded"] = True
@@ -5172,6 +5205,16 @@ class TodoApp(App):
         if isinstance(self.screen, DetailScreen):
             return
         self.action_view_detail()
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        # TextArea a altezza fissa resta indietro di una riga: forza il
+        # follow del cursore dopo il refresh (note, task template).
+        try:
+            ta = event.control
+            if isinstance(ta, TextArea):
+                self.call_after_refresh(ta.scroll_cursor_visible, animate=False)
+        except Exception:
+            pass
 
     def action_view_calendar(self) -> None:
         today = datetime.now().date()
@@ -5635,6 +5678,7 @@ class TodoApp(App):
                 mins=mins,
             )
         )
+        self._beep(1)
 
     def _finish_break(self, skipped: bool) -> None:
         was_long = self.focus_phase == "long"
@@ -5647,8 +5691,10 @@ class TodoApp(App):
             self.notify(T("n_skipped"))
         elif was_long:
             self.notify(T("n_long_done"))
+            self._beep(2)
         else:
             self.notify(T("n_short_done"))
+            self._beep(2)
 
     def _pomodoro_done(self) -> None:
         if self.focus_task_id is None:
@@ -5657,6 +5703,15 @@ class TodoApp(App):
             self._complete_focus()
         else:
             self._finish_break(skipped=True)
+
+    def _expire_current(self) -> None:
+        """Scadenza naturale del timer (dal tick): la pausa si completa, non si salta."""
+        if self.focus_task_id is None:
+            return
+        if (self.focus_phase or "focus") == "focus":
+            self._complete_focus()
+        else:
+            self._finish_break(skipped=False)
 
     def action_view_kanban(self) -> None:
         self.push_screen(KanbanScreen(self.todos))
@@ -5690,13 +5745,47 @@ class TodoApp(App):
         if self.focus_paused_secs is not None or not self.focus_end:
             return
         if datetime.now() >= self.focus_end:
-            self._pomodoro_done()
+            self._expire_current()
             return
         try:
             self.query_one("#stats-bar", Static).update(self._stats_text())
             self._update_pomodoro_bar()
         except Exception:
             pass
+
+    def _beep(self, times: int = 1) -> None:
+        if not self.config.get("sounds", True):
+            return
+        try:
+            print("\a" * max(1, times), end="", flush=True)
+        except Exception:
+            pass
+
+    def _check_reminders(self) -> None:
+        """10 min prima della scadenza oraria: info + suono, una sola volta."""
+        try:
+            lead = int(self.config.get("reminder_min", 10))
+        except (ValueError, TypeError):
+            lead = 10
+        if lead <= 0:
+            return
+        now = datetime.now()
+        for t in self.todos:
+            if t.state != "attivo" or not t.due or len(t.due.strip()) < 16:
+                continue
+            try:
+                due_dt = datetime.strptime(t.due.strip()[:16], "%Y-%m-%d %H:%M")
+            except ValueError:
+                continue
+            if not due_dt - timedelta(minutes=lead) <= now < due_dt:
+                continue
+            key = (t.id, due_dt.strftime("%Y-%m-%d %H:%M"))
+            if key in self._reminded:
+                continue
+            self._reminded.add(key)
+            mins = max(1, int((due_dt - now).total_seconds() // 60))
+            self.notify(T("n_rem_due", n=mins, h=due_dt.strftime("%H:%M"), t=t.title))
+            self._beep(1)
 
     def action_undo_delete(self) -> None:
         if not self._undo_stack:
@@ -6260,6 +6349,8 @@ class TodoApp(App):
             self.config["daily_goal"] = result["daily_goal"]
             self.config["weekly_goal"] = result["weekly_goal"]
             self.config["pomo_daily_goal"] = result["pomo_daily_goal"]
+            self.config["reminder_min"] = result["reminder_min"]
+            self.config["sounds"] = result["sounds"]
             old_lang = self.config.get("lang", "auto")
             self.config["lang"] = result.get("lang", old_lang)
             self._save_config()
