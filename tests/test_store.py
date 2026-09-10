@@ -49,7 +49,13 @@ def test_lookup_e_gerarchia():
 
 
 def test_remove_ids_ordine_e_indice():
-    s = TodoStore([make_todo("A", todo_id=1), make_todo("B", todo_id=2), make_todo("C", todo_id=3)])
+    s = TodoStore(
+        [
+            make_todo("A", todo_id=1),
+            make_todo("B", todo_id=2),
+            make_todo("C", todo_id=3),
+        ]
+    )
     removed = s.remove_ids({3, 1})
     assert [t.title for t in removed] == ["A", "C"]
     assert [t.title for t in s.all()] == ["B"]

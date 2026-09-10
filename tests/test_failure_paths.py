@@ -59,7 +59,9 @@ def test_snapshot_parziale_ripristina_solo_presenti(tmp_files):
     _zip_snapshot(
         zpath,
         {
-            "todos.json": json.dumps([{"id": 9, "title": "VECCHIO", "priority": "media"}]),
+            "todos.json": json.dumps(
+                [{"id": 9, "title": "VECCHIO", "priority": "media"}]
+            ),
             "manifest.json": json.dumps({"app": "tasko", "created": "x", "files": {}}),
         },
     )

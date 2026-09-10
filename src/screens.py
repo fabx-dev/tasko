@@ -2023,10 +2023,19 @@ class ReviewScreen(ModalScreen[None]):
             self.tomorrow = self.today
 
     def _done_today(self) -> list[TodoItem]:
-        return [t for t in self.all_todos if t.done and (t.completed_at or "")[:10] == self.today]
+        return [
+            t
+            for t in self.all_todos
+            if t.done and (t.completed_at or "")[:10] == self.today
+        ]
 
     def _pomo_today(self) -> int:
-        return sum(1 for t in self.all_todos for ts in (t.pomodoro_log or []) if ts[:10] == self.today)
+        return sum(
+            1
+            for t in self.all_todos
+            for ts in (t.pomodoro_log or [])
+            if ts[:10] == self.today
+        )
 
     def _is_overdue(self, t: TodoItem) -> bool:
         due = _due_date_part(t.due)
@@ -2063,7 +2072,10 @@ class ReviewScreen(ModalScreen[None]):
             cands = self._candidates()
             if cands:
                 yield SelectionList(
-                    *[ (self._option_label(t), t.id, i < 3) for i, t in enumerate(cands) ],
+                    *[
+                        (self._option_label(t), t.id, i < 3)
+                        for i, t in enumerate(cands)
+                    ],
                     id="rev-list",
                 )
             else:
