@@ -2082,8 +2082,8 @@ class ReviewScreen(ModalScreen[None]):
                 yield Static(T("rev_empty_cand"))
             yield Static(T("rev_legend"), id="rev-legend")
             with Horizontal(id="rev-buttons"):
-                yield Button(T("rev_confirm"), id="rev-confirm", variant="primary")
-                yield Button(T("ui_close_esc"), id="rev-close", variant="default")
+                yield Button(T("form_save"), id="rev-confirm", variant="default")
+                yield Button(T("form_cancel"), id="rev-close", variant="default")
 
     def _summary_text(self, n_done: int) -> str:
         goal_txt = T("rev_goal", n=self.daily_goal) if self.daily_goal > 0 else ""
