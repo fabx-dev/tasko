@@ -1,7 +1,12 @@
 """Tasko: entry point, init lingua, re-export compatibilita."""
 
 import json
+import sys
 from pathlib import Path
+
+if __package__ in (None, ""):
+    # Esecuzione come script (python src/main.py): rende importabile il package.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 try:
     from src.lang import T, resolve_lang, set_lang
