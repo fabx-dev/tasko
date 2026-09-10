@@ -46,6 +46,7 @@ from src.screens import (
     PasswordScreen,
     PomodoroScreen,
     RestoreScreen,
+    ReviewScreen,
     SearchScreen,
     SecurityScreen,
     SettingsScreen,
@@ -985,6 +986,17 @@ class TodoApp(App):
             self._populate_table()
 
         self.push_screen(DailyPlanScreen(self.todos, on_change))
+
+    def action_open_review(self) -> None:
+        def on_change() -> None:
+            self._save_data()
+            self._populate_table()
+
+        try:
+            goal = int(self.config.get("daily_goal", 0) or 0)
+        except (ValueError, TypeError):
+            goal = 0
+        self.push_screen(ReviewScreen(self.todos, on_change, daily_goal=goal))
 
     def action_view_stats(self) -> None:
         self.push_screen(

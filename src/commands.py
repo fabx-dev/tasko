@@ -27,6 +27,7 @@ class TaskoMenuProvider(Provider):
         (T("menu_imp_csv_t"), T("menu_imp_csv_h"), "action_import_csv"),
         (T("menu_archive_do_t"), T("menu_archive_do_h"), "action_archive_done"),
         (T("menu_archive_view_t"), T("menu_archive_view_h"), "action_view_archive"),
+        (T("menu_review_t"), T("menu_review_h"), "action_open_review"),
     )
 
     def _iter(self):

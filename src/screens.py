@@ -8,6 +8,15 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
+from textual.widgets import (
+    Button,
+    Input,
+    Label,
+    Select,
+    SelectionList,
+    Static,
+    TextArea,
+)
 
 from src import crypto as _crypto
 from src.lang import (
@@ -1953,6 +1962,161 @@ class DailyPlanScreen(ModalScreen[None]):
         self.notify(T("n_plan_susp_none"))
 
     def action_close(self) -> None:
+        self.dismiss()
+
+
+class ReviewScreen(ModalScreen[None]):
+    """Chiusura giornata: riepilogo di oggi + scelta del piano di domani."""
+
+    CSS = """
+    #rev-list {
+        height: auto;
+        max-height: 16;
+        margin-bottom: 1;
+    }
+    #rev-summary {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #rev-legend {
+        height: auto;
+        margin-top: 1;
+    }
+    #rev-buttons {
+        width: 100%;
+        height: 3;
+        margin-top: 1;
+    }
+    #rev-buttons Button {
+        width: 1fr;
+        min-width: 14;
+        height: 3;
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        Binding("escape", "close", "Chiudi"),
+        Binding("ctrl+enter", "confirm", "Conferma", show=False),
+    ]
+
+    def __init__(
+        self,
+        all_todos: list[TodoItem],
+        on_change,
+        today: str | None = None,
+        daily_goal: int = 0,
+    ) -> None:
+        super().__init__()
+        self.all_todos = all_todos
+        self.on_change = on_change
+        self.today = today or datetime.now().strftime("%Y-%m-%d")
+        try:
+            self.daily_goal = max(0, int(daily_goal or 0))
+        except (ValueError, TypeError):
+            self.daily_goal = 0
+        try:
+            self.tomorrow = (
+                datetime.strptime(self.today, "%Y-%m-%d") + timedelta(days=1)
+            ).strftime("%Y-%m-%d")
+        except ValueError:
+            self.tomorrow = self.today
+
+    def _done_today(self) -> list[TodoItem]:
+        return [t for t in self.all_todos if t.done and (t.completed_at or "")[:10] == self.today]
+
+    def _pomo_today(self) -> int:
+        return sum(1 for t in self.all_todos for ts in (t.pomodoro_log or []) if ts[:10] == self.today)
+
+    def _is_overdue(self, t: TodoItem) -> bool:
+        due = _due_date_part(t.due)
+        return bool(due) and due < self.today
+
+    def _candidates(self) -> list[TodoItem]:
+        cands = [t for t in self.all_todos if t.state == "attivo"]
+        cands.sort(
+            key=lambda t: (
+                not self._is_overdue(t),
+                _due_date_part(t.due) != self.tomorrow,
+                PRIORITY_ORDER.get(t.priority.value, 9),
+                _due_date_part(t.due) or "9999",
+                t.title.lower(),
+            )
+        )
+        return cands
+
+    @staticmethod
+    def _option_label(t: TodoItem) -> str:
+        due = _due_date_part(t.due)
+        extra = f" (scad. {due})" if due else ""
+        return f"{t.title}{extra}  #{t.id}"
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="rev-box"):
+            yield Label(
+                f"[b]{T('rev_title', date=_format_date_it(self.today))}[/b]",
+                id="rev-title",
+            )
+            done = self._done_today()
+            yield Static(self._summary_text(len(done)), id="rev-summary")
+            yield Label(T("rev_cand", date=_format_date_it(self.tomorrow)))
+            cands = self._candidates()
+            if cands:
+                yield SelectionList(
+                    *[ (self._option_label(t), t.id, i < 3) for i, t in enumerate(cands) ],
+                    id="rev-list",
+                )
+            else:
+                yield Static(T("rev_empty_cand"))
+            yield Static(T("rev_legend"), id="rev-legend")
+            with Horizontal(id="rev-buttons"):
+                yield Button(T("rev_confirm"), id="rev-confirm", variant="primary")
+                yield Button(T("ui_close_esc"), id="rev-close", variant="default")
+
+    def _summary_text(self, n_done: int) -> str:
+        goal_txt = T("rev_goal", n=self.daily_goal) if self.daily_goal > 0 else ""
+        return T("rev_summary", done=n_done, goal=goal_txt, pomo=self._pomo_today())
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#rev-list", SelectionList).focus()
+        except Exception:
+            try:
+                self.query_one("#rev-confirm", Button).focus()
+            except Exception:
+                self.focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "rev-close":
+            self.dismiss()
+        elif event.button.id == "rev-confirm":
+            self._confirm()
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+    def action_confirm(self) -> None:
+        self._confirm()
+
+    def _selected_ids(self) -> set:
+        try:
+            return set(self.query_one("#rev-list", SelectionList).selected)
+        except Exception:
+            return set()
+
+    def _confirm(self) -> None:
+        selected = self._selected_ids()
+        n = 0
+        for t in self.all_todos:
+            if t.state != "attivo":
+                continue
+            if t.id in selected:
+                t.planned_for = self.tomorrow
+                n += 1
+            elif t.planned_for == self.tomorrow:
+                t.planned_for = ""
+        self.on_change()
+        self.notify(T("n_rev_saved", n=n))
         self.dismiss()
 
 

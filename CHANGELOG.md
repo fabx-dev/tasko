@@ -20,6 +20,8 @@ Entries in English from now on.
 - Stale `build/` artifacts untracked (now git-ignored with caches and `dist/`)
 
 
+### Added (sprint 5)
+- Day closing review: today summary (done vs goal, pomodoros) and tomorrow plan picker with top-3 preselection (menu entry, no new global key)
 ## [0.3.0] - 2026-09-10
 
 ### Added
