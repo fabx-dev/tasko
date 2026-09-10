@@ -81,10 +81,12 @@ def test_health_ui(tmp_files):
 
 
 def _cli(args, home):
+    from pathlib import Path as _P
+
     env = dict(os.environ, TASKO_HOME=str(home))
     return subprocess.run(
         [sys.executable, "-m", "src.main", *args],
-        cwd="/home/fabri/projects/myapp",
+        cwd=str(_P(__file__).resolve().parent.parent),
         env=env,
         capture_output=True,
         text=True,
