@@ -1,6 +1,9 @@
 # Tasko — contesto per le sessioni agent
 
 > Leggere questo file all'inizio di ogni sessione di lavoro sul repo.
+> Se il tuo commit cambia fatti documentati qui (architettura, convenzioni,
+> workflow, lezioni apprese), aggiorna questo file nello stesso commit.
+> In caso di dubbio, aggiorna.
 > Lingua dell'utente: italiano. Risposte concise, niente emoji.
 
 ## 1. Cos'è
