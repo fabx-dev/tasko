@@ -83,6 +83,11 @@ from src.storage import (
 )
 from src.store import TodoStore
 
+# Il toast del reminder scadenze resta visibile finche' non lo clicchi
+# (default Textual: 5 s) e suona 3 beep invece di 1.
+REMINDER_TOAST_TIMEOUT = 600
+REMINDER_BEEPS = 3
+
 
 class ClickableDataTable(DataTable):
     """DataTable that opens a row detail on a single click."""
@@ -1550,8 +1555,11 @@ class TodoApp(App):
                 continue
             self._reminded.add(key)
             mins = max(1, int((due_dt - now).total_seconds() // 60))
-            self.notify(T("n_rem_due", n=mins, h=due_dt.strftime("%H:%M"), t=t.title))
-            self._beep(1)
+            self.notify(
+                T("n_rem_due", n=mins, h=due_dt.strftime("%H:%M"), t=t.title),
+                timeout=REMINDER_TOAST_TIMEOUT,
+            )
+            self._beep(REMINDER_BEEPS)
 
     def action_undo_delete(self) -> None:
         if not self._undo_stack:

@@ -26,11 +26,26 @@ def test_solo_con_orario_una_tantum(tmp_files, capsys):
     assert (1, app.todos[0].due.strip()) in app._reminded
     assert len(app._reminded) == 1
     out = capsys.readouterr().out
-    assert out.count("\a") == 1
+    assert out.count("\a") == 3
     # seconda passata: niente doppioni, niente beep
     app._check_reminders()
     assert len(app._reminded) == 1
     assert capsys.readouterr().out == ""
+
+
+def test_reminder_persistente_fino_al_click(tmp_files):
+    """Il toast del reminder usa timeout lungo (default Textual: 5 s)."""
+    from src.app import REMINDER_TOAST_TIMEOUT
+
+    assert REMINDER_TOAST_TIMEOUT >= 600
+    app = make_app([make_todo("VICINO", due=_due_in(5), todo_id=1)])
+    app.config["reminder_min"] = 10
+    app.config["sounds"] = False
+    calls = []
+    app.notify = lambda msg, **kw: calls.append(kw)
+    app._check_reminders()
+    assert len(calls) == 1
+    assert calls[0].get("timeout") == REMINDER_TOAST_TIMEOUT
 
 
 def test_vecchio_e_spento_e_scaduto(tmp_files, capsys):
