@@ -1969,6 +1969,11 @@ class ReviewScreen(ModalScreen[None]):
     """Chiusura giornata: riepilogo di oggi + scelta del piano di domani."""
 
     CSS = """
+    #rev-box {
+        width: 80;
+        max-width: 95%;
+        max-height: 90%;
+    }
     #rev-list {
         height: auto;
         max-height: 16;
