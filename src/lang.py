@@ -208,7 +208,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "b_no": "No",
         # Pannello aiuto (h)
         "help_l1": " [bold]TASK:[/bold] [b]n[/b] nuovo  [b]e[/b] modifica  [b]d[/b] elimina  [b]u[/b] annulla  [b]s[/b] sotto-task  [b]Space[/b] stato... [1/2/3]",
-        "help_l2": " [bold]VEDI:[/bold] [b]Enter[/b] dettagli  [b]c[/b] calendario  [b]w[/b] settimana  [b]b[/b] mini-kanban  [b]B[/b] kanban-full  [b]p[/b] piano  [b]k[/b] stats  [b]y[/b] salute  [b]R[/b] chiusura",
+        "help_l2": " [bold]VEDI:[/bold] [b]Enter[/b] dettagli  [b]c[/b] calendario  [b]w[/b] settimana  [b]b[/b] mini-kanban  [b]B[/b] kanban-full  [b]p[/b] piano  [b]k[/b] stats  [b]y[/b] salute  [b]R[/b] chiusura giornata",
         "help_l3": " [bold]POMO (timer 🍅):[/bold] [b]o[/b] avvia/apri  [b]O[/b] pausa/riprendi  [b]X[/b] completa  (o click sui comandi nella barra rossa)",
         "help_l4": " [bold]FILTRA:[/bold] [b]f[/b] stato  [b]t[/b] tag  [b]g[/b] progetto  [b]/[/b] cerca   [bold]SISTEMA:[/bold] [b]T[/b] template  [b]v[/b] tema  [b]h[/b] aiuto  [b]q[/b] esci",
         "help_l5": " [bold]Stato task:[/bold] [red]O[/red]=Attivo  [yellow]P[/yellow]=Sospeso  [green]X[/green]=Completato   |   [b]m[/b] menu",
@@ -682,7 +682,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "b_no": "No",
         # Help panel (h)
         "help_l1": " [bold]TASKS:[/bold] [b]n[/b] new  [b]e[/b] edit  [b]d[/b] delete  [b]u[/b] undo  [b]s[/b] subtask  [b]Space[/b] status... [1/2/3]",
-        "help_l2": " [bold]VIEWS:[/bold] [b]Enter[/b] details  [b]c[/b] calendar  [b]w[/b] week  [b]b[/b] mini-kanban  [b]B[/b] kanban-full  [b]p[/b] plan  [b]k[/b] stats  [b]y[/b] health  [b]R[/b] closing",
+        "help_l2": " [bold]VIEWS:[/bold] [b]Enter[/b] details  [b]c[/b] calendar  [b]w[/b] week  [b]b[/b] mini-kanban  [b]B[/b] kanban-full  [b]p[/b] plan  [b]k[/b] stats  [b]y[/b] health  [b]R[/b] day closing",
         "help_l3": " [bold]POMO (🍅 timer):[/bold] [b]o[/b] start/open  [b]O[/b] pause/resume  [b]X[/b] complete  (or click the commands in the red bar)",
         "help_l4": " [bold]FILTER:[/bold] [b]f[/b] state  [b]t[/b] tag  [b]g[/b] project  [b]/[/b] search   [bold]SYSTEM:[/bold] [b]T[/b] template  [b]v[/b] theme  [b]h[/b] help  [b]q[/b] quit",
         "help_l5": " [bold]Task state:[/bold] [red]O[/red]=Active  [yellow]P[/yellow]=Paused  [green]X[/green]=Done   |   [b]m[/b] menu",
