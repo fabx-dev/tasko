@@ -3,6 +3,22 @@
 Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 Entries in English from now on.
 
+## [Unreleased]
+
+## [0.2.0] - 2026-09-10
+
+### Added
+- Optional file encryption (Fernet) with startup lock screen and Security menu
+- Due-time reminders (10 min lead) with bell, pomodoro end sounds, sound settings
+- Onboarding with demo data, app settings screen, template editing
+- Archive for done tasks with viewer and restore, CSV import
+- Goals with streaks, per-project breakdown, peak hours, punctuality, heatmap, stats CSV export
+- Full Italian/English UI with system detection
+
+### Fixed
+- Isolated test fixture (tests can no longer touch real home files)
+- Double detail popup on repeated clicks, pomodoro bar countdown, calendar alignment
+
 ## [0.1.0] - 2026-09-09
 
 First public release.
