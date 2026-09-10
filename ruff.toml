@@ -6,3 +6,7 @@
 [lint]
 select = ["E", "F", "I", "UP045", "PIE794"]
 ignore = ["E501"]
+
+[lint.per-file-ignores]
+# src/main.py importa i moduli DOPO il set lingua (le classi valutano T() all'import)
+"src/main.py" = ["E402"]

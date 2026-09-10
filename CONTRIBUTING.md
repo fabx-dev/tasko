@@ -18,6 +18,17 @@ python -m pytest tests/ -q
 - UI text goes through `src/lang.py` in **both** languages (`T("key")` + parity test).
 - Small, focused commits; one feature per PR.
 
+## Layout (`src/`)
+
+- `models.py` — TodoItem, priorità, ricorrenze, validazioni
+- `storage.py` — paths, load/save, backup/restore, config
+- `screens.py` — tutte le schermate modali (dipendono solo da models/storage/lang)
+- `commands.py` — provider menu/palette
+- `cli.py` — `tasko add|list|done|show`
+- `app.py` — TodoApp (l'unico che importa tutto)
+- `main.py` — entry point + re-export di compatibilità
+- `lang.py`, `crypto.py` — standalone, senza dipendenze interne
+
 ## What gets rejected
 
 - New dependencies without discussion (offline-first, lean install).

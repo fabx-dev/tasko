@@ -9,20 +9,35 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import src.lang as lang  # noqa: E402  (serve sys.path sopra)
+import src.app as app_module  # noqa: E402  (serve sys.path sopra)
+import src.cli as cli_module  # noqa: E402
+import src.commands as commands_module  # noqa: E402
+import src.lang as lang  # noqa: E402
 import src.main as main  # noqa: E402
+import src.models as models  # noqa: E402
+import src.screens as screens  # noqa: E402
+import src.storage as storage  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _italian_module():
-    """Riesegue src.main con lingua italiana FORZATA (TASKO_LANG vince su
-    config reale e locale di macchina): BINDINGS deterministici ovunque."""
+    """Ricarica i moduli con lingua italiana FORZATA (TASKO_LANG vince su
+    config reale e locale di macchina): stringhe valutate all'import
+    deterministiche ovunque. Ordine = dipendenze."""
     import importlib
     import os
 
     os.environ["TASKO_LANG"] = "it"
     lang.set_lang("it")
-    importlib.reload(main)
+    for mod in (
+        storage,
+        screens,
+        commands_module,
+        cli_module,
+        app_module,
+        main,
+    ):
+        importlib.reload(mod)
     lang.set_lang("it")
     yield
     lang.set_lang("it")
@@ -47,13 +62,19 @@ def screen_texts(screen) -> str:
 @pytest.fixture(autouse=True)
 def tmp_files(tmp_path, monkeypatch):
     """AUTOUSE: redireziona ogni path su file temporanei (mai ~/.todo_* nei test)."""
+    monkeypatch.setattr(storage, "DATA_FILE", tmp_path / "todo.json")
+    monkeypatch.setattr(storage, "TEMPLATE_FILE", tmp_path / "templates.json")
+    monkeypatch.setattr(storage, "POMODORO_FILE", tmp_path / "pomo.json")
+    monkeypatch.setattr(storage, "CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(storage, "ARCHIVE_FILE", tmp_path / "archive.json")
+    monkeypatch.setattr(storage, "BACKUP_DIR", tmp_path / "backups")
+    # Mirror su main (re-export di compatibilita' usati in qualche test).
     monkeypatch.setattr(main, "DATA_FILE", tmp_path / "todo.json")
     monkeypatch.setattr(main, "TEMPLATE_FILE", tmp_path / "templates.json")
     monkeypatch.setattr(main, "POMODORO_FILE", tmp_path / "pomo.json")
     monkeypatch.setattr(main, "CONFIG_FILE", tmp_path / "config.json")
     monkeypatch.setattr(main, "ARCHIVE_FILE", tmp_path / "archive.json")
     monkeypatch.setattr(main, "BACKUP_DIR", tmp_path / "backups")
-    monkeypatch.setattr(main, "TEMPLATES", main.load_templates())
     return tmp_path
 
 
@@ -66,11 +87,11 @@ def italian_lang():
 
 
 def make_todo(title="T", todo_id=1, **kwargs):
-    return main.TodoItem(title=title, todo_id=todo_id, **kwargs)
+    return models.TodoItem(title=title, todo_id=todo_id, **kwargs)
 
 
 def make_app(todos):
-    app = main.TodoApp()
+    app = app_module.TodoApp()
     app.todos = list(todos)
     app.next_id = max((t.id or 0 for t in todos), default=0) + 1
     return app
