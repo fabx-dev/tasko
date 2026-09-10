@@ -74,6 +74,18 @@ def _dump_state_text(obj) -> str:
     return _crypto.protect_text(json.dumps(obj, indent=2, ensure_ascii=False))
 
 
+def _home() -> Path:
+    """Base dati: TASKO_HOME se impostata (test/automazioni), altrimenti home reale."""
+    import os
+
+    override = os.environ.get("TASKO_HOME", "").strip()
+    if override:
+        base = Path(override).expanduser()
+        base.mkdir(parents=True, exist_ok=True)
+        return base
+    return Path.home()
+
+
 def _apply_startup_lang() -> str:
     """Legge TASKO_LANG/config e imposta la lingua PRIMA delle classi (BINDINGS fissi)."""
     import os
@@ -84,9 +96,7 @@ def _apply_startup_lang() -> str:
     if env.startswith("en"):
         return set_lang("en")
     try:
-        raw = json.loads(
-            (Path.home() / ".todo_config.json").read_text(encoding="utf-8")
-        )
+        raw = json.loads((_home() / ".todo_config.json").read_text(encoding="utf-8"))
         val = raw.get("lang", "auto") if isinstance(raw, dict) else "auto"
     except (OSError, ValueError):
         val = "auto"
@@ -95,7 +105,7 @@ def _apply_startup_lang() -> str:
 
 _apply_startup_lang()
 
-DATA_FILE = Path.home() / ".todo_app.json"
+DATA_FILE = _home() / ".todo_app.json"
 MAX_DEPTH = 6
 
 # Nomi giorni/mesi localizzati: vedi lang.months(), lang.days_short(),
@@ -918,7 +928,7 @@ class ThemeListScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
 
-TEMPLATE_FILE = Path.home() / ".todo_templates.json"
+TEMPLATE_FILE = _home() / ".todo_templates.json"
 
 DEFAULT_TEMPLATES: dict[str, list[dict]] = {
     T("tpldef_client"): [
@@ -1028,7 +1038,7 @@ def save_templates(templates: dict[str, list[dict]]) -> None:
 TEMPLATES: dict[str, list[dict]] = load_templates()
 
 
-CONFIG_FILE = Path.home() / ".todo_config.json"
+CONFIG_FILE = _home() / ".todo_config.json"
 DEFAULT_CONFIG: dict = {
     "theme": "matrix",
     "kanban_visible": True,
@@ -1117,7 +1127,7 @@ def save_config(cfg: dict) -> None:
     tmp.replace(CONFIG_FILE)
 
 
-ARCHIVE_FILE = Path.home() / ".todo_archive.json"
+ARCHIVE_FILE = _home() / ".todo_archive.json"
 
 
 def load_archive() -> list[dict]:
@@ -1144,7 +1154,7 @@ def save_archive(items: list[dict]) -> None:
     tmp.replace(ARCHIVE_FILE)
 
 
-BACKUP_DIR = Path.home() / "Tasko_backups"
+BACKUP_DIR = _home() / "Tasko_backups"
 BACKUP_KEEP = 14
 
 
@@ -1255,7 +1265,7 @@ def restore_snapshot(path: Path) -> None:
             shutil.move(str(tmp), str(dest))
 
 
-POMODORO_FILE = Path.home() / ".todo_pomodoro.json"
+POMODORO_FILE = _home() / ".todo_pomodoro.json"
 POMO_PHASES = ("focus", "short", "long")
 POMO_PHASE_PRESETS: dict[str, tuple[int, ...]] = {
     "focus": (15, 25, 50),
@@ -4416,12 +4426,158 @@ class SecurityScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+# Soglie salute progetti (modificabili in un punto solo).
+HEALTH_CRIT_LATE = 3
+HEALTH_CRIT_RATIO = 0.25
+
+
+class HealthScreen(ModalScreen[None]):
+    """Salute progetti: avanzamento, ritardi, momentum, verdetto."""
+
+    CSS = """
+    HealthScreen {
+        align: center middle;
+    }
+    #hea-box {
+        width: 64;
+        max-width: 92%;
+        max-height: 88%;
+        border: thick $primary;
+        background: $surface;
+        padding: 1 2;
+    }
+    #hea-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 0;
+        height: auto;
+    }
+    #hea-hint {
+        text-align: center;
+        color: $text-muted;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #hea-list {
+        height: auto;
+        max-height: 22;
+        margin-bottom: 1;
+    }
+    #hea-close {
+        width: 100%;
+        min-width: 16;
+        height: 3;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "close", "Chiudi")]
+
+    def __init__(self, all_todos: list[TodoItem]) -> None:
+        super().__init__()
+        self.all_todos = all_todos
+
+    def _rows(self) -> list[tuple]:
+        """(progetto, verdetto, colore, fatti, tot, ritardo, momentum7). Peggiori prima."""
+        today = datetime.now().date()
+        today_s = today.strftime("%Y-%m-%d")
+        w0 = (today - timedelta(days=6)).strftime("%Y-%m-%d")
+        w1 = (today - timedelta(days=13)).strftime("%Y-%m-%d")
+        agg: dict[str, dict] = {}
+
+        def bucket(proj: str) -> dict:
+            return agg.setdefault(
+                proj, {"tot": 0, "done": 0, "late": 0, "now": 0, "prev": 0}
+            )
+
+        for t in self.all_todos:
+            if t.is_subtask or not t.project:
+                continue
+            if t.done:
+                a = bucket(t.project)
+                a["tot"] += 1
+                a["done"] += 1
+                d = (t.completed_at or "")[:10]
+                if w0 <= d <= today_s:
+                    a["now"] += 1
+                elif w1 <= d < w0:
+                    a["prev"] += 1
+            elif t.state != "completato":
+                a = bucket(t.project)
+                a["tot"] += 1
+                if _due_date_part(t.due) and _due_date_part(t.due) < today_s:
+                    a["late"] += 1
+        out = []
+        for proj, a in agg.items():
+            if a["tot"] <= 0:
+                continue
+            ratio = a["done"] / a["tot"]
+            if a["late"] >= HEALTH_CRIT_LATE or (
+                ratio < HEALTH_CRIT_RATIO and a["late"] > 0
+            ):
+                verdict, color, rank = T("health_crit"), "red", 0
+            elif a["late"] > 0 or (a["now"] - a["prev"]) < 0:
+                verdict, color, rank = T("health_risk"), "yellow", 1
+            else:
+                verdict, color, rank = T("health_ok"), "green", 2
+            out.append(
+                (
+                    rank,
+                    proj,
+                    verdict,
+                    color,
+                    a["done"],
+                    a["tot"],
+                    a["late"],
+                    a["now"] - a["prev"],
+                )
+            )
+        out.sort(key=lambda r: (r[0], r[1]))
+        return [(p, v, c, d, t, ll, mm) for _, p, v, c, d, t, ll, mm in out]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="hea-box"):
+            yield Label(T("health_title"), id="hea-title")
+            yield Label(T("health_hint"), id="hea-hint")
+            with VerticalScroll(id="hea-list"):
+                rows = self._rows()
+                if not rows:
+                    yield Label(T("health_empty"))
+                for proj, verdict, color, done, tot, late, mom in rows:
+                    sign = "+" if mom > 0 else ""
+                    yield Label(f"[{color}][b]{verdict}[/b][/] {proj}")
+                    yield Static(
+                        T(
+                            "health_row",
+                            done=done,
+                            tot=tot,
+                            late=late,
+                            mom=f"{sign}{mom}",
+                        )
+                    )
+            yield Button(T("ui_close_esc"), id="hea-close", variant="default")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "hea-close":
+            self.dismiss()
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#hea-close", Button).focus()
+        except Exception:
+            pass
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+
 class TaskoMenuProvider(Provider):
     """Voci del menu principale (m): solo configurazione, import/export e utility senza tasto."""
 
     # (titolo, aiuto, nome action di TodoApp)
     MENU_IT: tuple[tuple[str, str, str], ...] = (
         (T("menu_settings_t"), T("menu_settings_h"), "action_open_settings"),
+        (T("menu_health_t"), T("menu_health_h"), "action_view_health"),
         (T("menu_security_t"), T("menu_security_h"), "action_open_security"),
         (T("menu_goals_t"), T("menu_goals_h"), "action_edit_goals"),
         (T("menu_clearf_t"), T("menu_clearf_h"), "action_clear_filters"),
@@ -4551,6 +4707,7 @@ class TodoApp(App):
         Binding("X", "pomodoro_finish", "Completa pomo", show=False),
         Binding("u", "undo_delete", "Annulla", show=False),
         Binding("T", "new_from_template", "Template", show=False),
+        Binding("y", "view_health", "Salute", show=False),
         Binding("v", "choose_theme", "Tema...", show=False),
         Binding("ctrl+s", "save_screenshot", "Screenshot", show=False),
         Binding("ctrl+e", "export_data", "Export", show=False),
@@ -5713,6 +5870,9 @@ class TodoApp(App):
         else:
             self._finish_break(skipped=False)
 
+    def action_view_health(self) -> None:
+        self.push_screen(HealthScreen(self.todos))
+
     def action_view_kanban(self) -> None:
         self.push_screen(KanbanScreen(self.todos))
 
@@ -6065,7 +6225,7 @@ class TodoApp(App):
 
     def action_export_data(self) -> None:
         try:
-            out_dir = Path.home() / "Tasko_screenshots"
+            out_dir = _home() / "Tasko_screenshots"
             out_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             md = out_dir / f"tasko_export_{ts}.md"
@@ -6097,7 +6257,7 @@ class TodoApp(App):
                     k = str(ts)[:10]
                     pomo_by_date[k] = pomo_by_date.get(k, 0) + 1
             days = sorted(set(by_date) | set(pomo_by_date))
-            out_dir = Path.home() / "Tasko_screenshots"
+            out_dir = _home() / "Tasko_screenshots"
             out_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             csv_path = out_dir / f"tasko_stats_{ts}.csv"
@@ -6115,7 +6275,7 @@ class TodoApp(App):
         import csv
 
         try:
-            out_dir = Path.home() / "Tasko_screenshots"
+            out_dir = _home() / "Tasko_screenshots"
             out_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             csv_path = out_dir / f"tasko_export_{ts}.csv"
@@ -6162,7 +6322,7 @@ class TodoApp(App):
 
     def action_import_csv(self) -> None:
         try:
-            out_dir = Path.home() / "Tasko_screenshots"
+            out_dir = _home() / "Tasko_screenshots"
             files = (
                 sorted(
                     out_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True
@@ -6654,7 +6814,7 @@ class TodoApp(App):
             self.notify(T("n_shot_err", e=exc), severity="error")
 
     def _save_screenshot_safe(self) -> str:
-        out_dir = Path.home() / "Tasko_screenshots"
+        out_dir = _home() / "Tasko_screenshots"
         out_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output = out_dir / f"tasko_{timestamp}.svg"
@@ -6679,7 +6839,7 @@ class TodoApp(App):
             if path is not None:
                 self.notify(T("n_shot_saved", p=path))
                 return None
-            out_dir = Path(path) if path else (Path.home() / "Tasko_screenshots")
+            out_dir = Path(path) if path else (_home() / "Tasko_screenshots")
             out_dir.mkdir(parents=True, exist_ok=True)
             name = filename or f"tasko_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg"
             output = out_dir / name
@@ -6691,7 +6851,158 @@ class TodoApp(App):
         return None
 
 
+def _cli_next_id(todos: list[TodoItem]) -> int:
+    return max((t.id or 0 for t in todos), default=0) + 1
+
+
+def _cli_parse_priority(value: str | None) -> Priority:
+    v = (value or "media").strip().lower()
+    mapping = {
+        "alta": Priority.HIGH,
+        "high": Priority.HIGH,
+        "h": Priority.HIGH,
+        "media": Priority.MEDIUM,
+        "medium": Priority.MEDIUM,
+        "m": Priority.MEDIUM,
+        "bassa": Priority.LOW,
+        "low": Priority.LOW,
+        "l": Priority.LOW,
+    }
+    return mapping.get(v, Priority.MEDIUM)
+
+
+def _cli_state_filter(value: str | None) -> str | None:
+    if not value:
+        return None
+    v = value.strip().lower()
+    mapping = {
+        "attivo": "attivo",
+        "active": "attivo",
+        "sospeso": "in_sospeso",
+        "in_sospeso": "in_sospeso",
+        "paused": "in_sospeso",
+        "completato": "completato",
+        "completati": "completato",
+        "done": "completato",
+    }
+    return mapping.get(v)
+
+
+def _cli_main(argv: list[str]) -> int:
+    """CLI non interattiva: tasko add|list|done|show. Ritorna exit code."""
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(prog="tasko", description="Tasko CLI")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p_add = sub.add_parser("add", help="Crea un task")
+    p_add.add_argument("title", help="Titolo del task")
+    p_add.add_argument("--project", default="", help="Progetto")
+    p_add.add_argument(
+        "--due", default="", help="Scadenza (YYYY-MM-DD [HH:MM], oggi, domani)"
+    )
+    p_add.add_argument("--priority", default="media", help="alta|media|bassa")
+    p_add.add_argument("--tags", default="", help="Tag separati da virgola")
+    p_list = sub.add_parser("list", help="Elenca i task")
+    p_list.add_argument("--state", default=None, help="attivo|sospeso|completato")
+    p_list.add_argument("--project", default=None, help="Filtra per progetto")
+    p_list.add_argument(
+        "--porcelain",
+        action="store_true",
+        help="Output stabile id|stato|priorita|scadenza|titolo",
+    )
+    p_done = sub.add_parser("done", help="Completa un task")
+    p_done.add_argument("id", type=int, help="ID del task")
+    p_show = sub.add_parser("show", help="Dettaglio testuale di un task")
+    p_show.add_argument("id", type=int, help="ID del task")
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        return int(exc.code or 0)
+
+    def err(msg: str) -> None:
+        print(f"tasko: {msg}", file=sys.stderr)
+
+    if args.cmd == "add":
+        due = _normalize_date(args.due) if args.due else ""
+        if args.due and not _is_valid_date(due):
+            err(f"data non valida: {args.due!r}")
+            return 2
+        todos = load_todos()
+        todo = TodoItem(
+            title=args.title.strip(),
+            priority=_cli_parse_priority(args.priority),
+            due=due,
+            project=(args.project or "").strip().lower(),
+            tags=[t.strip().lower() for t in (args.tags or "").split(",") if t.strip()],
+            todo_id=_cli_next_id(todos),
+        )
+        todos.append(todo)
+        save_todos(todos)
+        print(todo.id)
+        return 0
+
+    if args.cmd == "list":
+        state = _cli_state_filter(args.state)
+        if args.state and state is None:
+            err(f"stato non valido: {args.state!r}")
+            return 2
+        rows = []
+        for t in load_todos():
+            if state is not None and t.state != state:
+                continue
+            if args.project is not None and t.project != args.project.strip().lower():
+                continue
+            rows.append(t)
+        rows.sort(key=lambda t: (t.due or "9999", t.title.lower()))
+        for t in rows:
+            if args.porcelain:
+                print(f"{t.id}|{t.state}|{t.priority.value}|{t.due or '-'}|{t.title}")
+            else:
+                mark = "X" if t.done else ("P" if t.paused else "O")
+                proj = f" @{t.project}" if t.project else ""
+                print(
+                    f"#{t.id} [{mark}] {t.title}{proj} (scad: {t.due or '-'}, prio: {t.priority.value})"
+                )
+        return 0
+
+    todos = load_todos()
+    todo = next((t for t in todos if t.id == args.id), None)
+    if todo is None:
+        err(f"task #{args.id} non trovato")
+        return 1
+    if args.cmd == "done":
+        if todo.done:
+            print(todo.id)
+            return 0
+        todo.done = True
+        todo.paused = False
+        todo.planned_for = ""
+        todo.completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+        save_todos(todos)
+        print(todo.id)
+        return 0
+    # show
+    lines = [
+        f"#{todo.id} {todo.title}",
+        f"stato: {todo.state} | priorita: {todo.priority.value} | scadenza: {todo.due or '-'}",
+    ]
+    if todo.project:
+        lines.append(f"progetto: {todo.project}")
+    if todo.tags:
+        lines.append("tags: " + ", ".join(todo.tags))
+    if todo.notes:
+        lines.append(f"note: {todo.notes}")
+    lines.append(f"pomodori: {todo.pomodoros}")
+    print("\n".join(lines))
+    return 0
+
+
 def main() -> None:
+    import sys
+
+    if len(sys.argv) > 1:
+        raise SystemExit(_cli_main(sys.argv[1:]))
     TodoApp().run()
 
 

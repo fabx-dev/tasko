@@ -30,16 +30,13 @@ def _italian_module():
 
 
 def screen_texts(screen) -> str:
-    """Testo di tutti gli Static ESATTI (Label esclusa).
-
-    Compatibile con Textual 8.x (.content) e 3.x (.renderable).
-    """
-    from textual.widgets import Static
-
+    """Testo di Static e Label, compatibile Textual 8.x (.content) e 3.x (.renderable)."""
     out = []
-    for w in screen.query("Static"):
-        if type(w) is not Static:
+    seen = set()
+    for w in list(screen.query("Static")) + list(screen.query("Label")):
+        if id(w) in seen:
             continue
+        seen.add(id(w))
         content = getattr(w, "content", None)
         if content is None:
             content = getattr(w, "renderable", "")
