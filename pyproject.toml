@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tasko"
-version = "0.1.0"
+version = "0.3.0"
 description = "TUI todo list in italiano e inglese: kanban, pomodoro a cicli, statistiche, backup"
 readme = "README.md"
 requires-python = ">=3.12"

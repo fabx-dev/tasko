@@ -5,6 +5,21 @@ Entries in English from now on.
 
 ## [Unreleased]
 
+### Added
+- `TodoStore`: central todo container with id lookup, mutations and single `commit()` write path
+- Inter-process file locking (fcntl) with timeout for all state saves
+- Three-way per-id merge on save: CLI and TUI no longer overwrite each other
+- Tests: `test_store.py`, `test_concurrency.py`, `test_failure_paths.py`
+
+### Fixed
+- Locked (encrypted, no key) files no longer faked as corrupt `.corrotto.json` backups
+- CLI `add`/`done` go through the store (lock + merge)
+
+### Removed
+- Dead code: write-only `_trash`, unbound `action_toggle_theme`, duplicated `_apply_startup_lang`
+- Stale `build/` artifacts untracked (now git-ignored with caches and `dist/`)
+
+
 ## [0.3.0] - 2026-09-10
 
 ### Added

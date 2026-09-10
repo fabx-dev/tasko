@@ -82,7 +82,6 @@ from src.storage import (
     DATA_FILE,
     POMODORO_FILE,
     TEMPLATE_FILE,
-    _home,
     create_backup,
     list_snapshots,
     load_archive,
@@ -160,26 +159,6 @@ __all__ = [
     "snapshot_info",
     "T",
 ]
-
-
-def _apply_startup_lang() -> str:
-    """Legge TASKO_LANG/config e imposta la lingua PRIMA delle classi (BINDINGS fissi)."""
-    import os
-
-    env = os.environ.get("TASKO_LANG", "").strip().lower()
-    if env.startswith("it"):
-        return set_lang("it")
-    if env.startswith("en"):
-        return set_lang("en")
-    try:
-        raw = json.loads((_home() / ".todo_config.json").read_text(encoding="utf-8"))
-        val = raw.get("lang", "auto") if isinstance(raw, dict) else "auto"
-    except (OSError, ValueError):
-        val = "auto"
-    return set_lang(resolve_lang(val))
-
-
-_apply_startup_lang()
 
 
 def main() -> None:

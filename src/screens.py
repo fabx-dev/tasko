@@ -8,7 +8,6 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Select, Static, TextArea
 
 from src import crypto as _crypto
 from src.lang import (
@@ -43,9 +42,6 @@ class TodoFormScreen(ModalScreen[dict | None]):
     """Modal screen to add or edit a todo item."""
 
     CSS = """
-    TodoFormScreen {
-        align: center middle;
-    }
     #form-container {
         width: 72;
         max-width: 95%;
@@ -281,9 +277,6 @@ class ConfirmScreen(ModalScreen[bool]):
     """Simple confirmation dialog."""
 
     CSS = """
-    ConfirmScreen {
-        align: center middle;
-    }
     #confirm-box {
         width: 60;
         max-width: 90%;
@@ -339,16 +332,10 @@ class StateChoiceScreen(ModalScreen[str | None]):
     """Menu scelta per lo stato di un todo (Space)."""
 
     CSS = """
-    StateChoiceScreen {
-        align: center middle;
-    }
     #state-box {
         width: 36;
         max-width: 90%;
         height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #state-msg {
         text-align: center;
@@ -435,16 +422,10 @@ class ThemeListScreen(ModalScreen[str | None]):
     """Popup con lista temi selezionabile."""
 
     CSS = """
-    ThemeListScreen {
-        align: center middle;
-    }
     #theme-box {
         width: 52;
         max-width: 90%;
         max-height: 85%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #theme-title {
         text-align: center;
@@ -462,12 +443,6 @@ class ThemeListScreen(ModalScreen[str | None]):
         min-width: 16;
         height: 3;
         margin-bottom: 0;
-    }
-    #theme-close {
-        width: 100%;
-        min-width: 16;
-        height: 3;
-        margin-top: 1;
     }
     """
 
@@ -510,16 +485,10 @@ class SearchScreen(ModalScreen[str | None]):
     """Popup ricerca full-text con / ."""
 
     CSS = """
-    SearchScreen {
-        align: center middle;
-    }
     #search-box {
         width: 60;
         max-width: 90%;
         height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #search-title {
         text-align: center;
@@ -585,16 +554,10 @@ class WeekScreen(ModalScreen[None]):
     """Vista settimana Lun-Dom."""
 
     CSS = """
-    WeekScreen {
-        align: center middle;
-    }
     #week-box {
         width: 80;
         max-width: 95%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #week-title {
         text-align: center;
@@ -617,11 +580,6 @@ class WeekScreen(ModalScreen[None]):
         height: auto;
         max-height: 22;
         margin-bottom: 1;
-    }
-    #week-close {
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -702,23 +660,10 @@ class TemplateScreen(ModalScreen[tuple | None]):
     """Scelta template: Usa per creare i task, N nuovo, P da progetto, X elimina."""
 
     CSS = """
-    TemplateScreen {
-        align: center middle;
-    }
     #tpl-box {
         width: 60;
         max-width: 92%;
         max-height: 88%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #tpl-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #tpl-list {
         height: auto;
@@ -870,24 +815,11 @@ class TemplateCreateScreen(ModalScreen[dict | None]):
     """Crea un nuovo template: nome + un task per riga."""
 
     CSS = """
-    TemplateCreateScreen {
-        align: center middle;
-    }
     #tplc-box {
         width: 64;
         max-width: 92%;
         height: 90%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #tplc-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #tplc-body {
         width: 100%;
@@ -1003,23 +935,10 @@ class TemplateProjectScreen(ModalScreen[str | None]):
     """Sceglie un progetto esistente da cui creare un template."""
 
     CSS = """
-    TemplateProjectScreen {
-        align: center middle;
-    }
     #tplp-box {
         width: 52;
         max-width: 90%;
         max-height: 85%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #tplp-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #tplp-list {
         height: auto;
@@ -1031,11 +950,6 @@ class TemplateProjectScreen(ModalScreen[str | None]):
         min-width: 16;
         height: 3;
         margin-bottom: 1;
-    }
-    #tplp-close {
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -1078,23 +992,10 @@ class ImportCsvScreen(ModalScreen[str | None]):
     """Sceglie un CSV da importare (lista + percorso manuale)."""
 
     CSS = """
-    ImportCsvScreen {
-        align: center middle;
-    }
     #impcsv-box {
         width: 64;
         max-width: 92%;
         max-height: 88%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #impcsv-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #impcsv-list {
         height: auto;
@@ -1185,16 +1086,10 @@ class PomodoroScreen(ModalScreen[None]):
     """Timer pomodoro con durata impostabile, pausa/riprendi, live countdown."""
 
     CSS = """
-    PomodoroScreen {
-        align: center middle;
-    }
     #pomo-box {
         width: 46;
         max-width: 90%;
         height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #pomo-title {
         text-align: center;
@@ -1401,16 +1296,10 @@ class KanbanScreen(ModalScreen[None]):
     """Board kanban Attivo / Sospeso / Completato."""
 
     CSS = """
-    KanbanScreen {
-        align: center middle;
-    }
     #kb-box {
         width: 96;
         max-width: 98%;
         max-height: 92%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #kb-title {
         text-align: center;
@@ -1433,12 +1322,6 @@ class KanbanScreen(ModalScreen[None]):
         margin: 0 1;
         border: solid $primary-darken-1;
         padding: 0 1;
-    }
-    #kb-close {
-        width: 100%;
-        min-width: 16;
-        height: 3;
-        margin-top: 1;
     }
     """
 
@@ -1506,16 +1389,10 @@ class DetailScreen(ModalScreen[str | None]):
     """Screen to show todo details including notes and subtasks."""
 
     CSS = """
-    DetailScreen {
-        align: center middle;
-    }
     #detail-box {
         width: 60;
         max-width: 90%;
         max-height: 85%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #detail-title {
         text-style: bold;
@@ -1667,16 +1544,10 @@ class DayScreen(ModalScreen[None]):
     """Screen showing the todos due on a specific day."""
 
     CSS = """
-    DayScreen {
-        align: center middle;
-    }
     #day-box {
         width: 70;
         max-width: 90%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #day-title {
         text-align: center;
@@ -1693,12 +1564,6 @@ class DayScreen(ModalScreen[None]):
         height: auto;
         color: $text-muted;
         margin-bottom: 1;
-    }
-    #day-close {
-        margin-top: 1;
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -1741,16 +1606,10 @@ class CalendarScreen(ModalScreen[None]):
     """Screen to show todos on a monthly calendar grid."""
 
     CSS = """
-    CalendarScreen {
-        align: center middle;
-    }
     #calendar-box {
         width: 80;
         max-width: 95%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #calendar-title {
         text-align: center;
@@ -1782,12 +1641,6 @@ class CalendarScreen(ModalScreen[None]):
     #calendar-legend {
         margin-top: 1;
         height: auto;
-    }
-    #calendar-close {
-        margin-top: 1;
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -1919,16 +1772,10 @@ class DailyPlanScreen(ModalScreen[None]):
     """Screen showing today's planned tasks with quick add/remove."""
 
     CSS = """
-    DailyPlanScreen {
-        align: center middle;
-    }
     #plan-box {
         width: 80;
         max-width: 95%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #plan-title {
         text-align: center;
@@ -1944,12 +1791,6 @@ class DailyPlanScreen(ModalScreen[None]):
     #plan-legend {
         margin-top: 1;
         height: auto;
-    }
-    #plan-close {
-        margin-top: 1;
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -2119,22 +1960,9 @@ class GoalsScreen(ModalScreen[dict | None]):
     """Imposta obiettivi giornaliero/settimanale (0 = disattivato)."""
 
     CSS = """
-    GoalsScreen {
-        align: center middle;
-    }
     #goals-box {
         width: 52;
         max-width: 90%;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #goals-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
         height: auto;
     }
     #goals-hint {
@@ -2222,16 +2050,10 @@ class StatsScreen(ModalScreen[None]):
     """Screen to show productivity statistics."""
 
     CSS = """
-    StatsScreen {
-        align: center middle;
-    }
     #stats-box {
         width: 58;
         max-width: 92%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #stats-scroll {
         height: auto;
@@ -2254,12 +2076,6 @@ class StatsScreen(ModalScreen[None]):
     .stats-caption {
         height: auto;
         margin-bottom: 1;
-    }
-    #stats-close {
-        margin-top: 1;
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -2718,33 +2534,15 @@ class KeysScreen(ModalScreen[None]):
     """Popup con tutte le combinazioni di tasti (voce Tasti del menu)."""
 
     CSS = """
-    KeysScreen {
-        align: center middle;
-    }
     #keys-box {
         width: 66;
         max-width: 92%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #keys-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #keys-list {
         height: auto;
         max-height: 24;
         margin-bottom: 1;
-    }
-    #keys-close {
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -2778,24 +2576,11 @@ class SettingsScreen(ModalScreen[dict | None]):
     """Impostazioni app: tema, vista, obiettivi, durate pomodoro."""
 
     CSS = """
-    SettingsScreen {
-        align: center middle;
-    }
     #set-box {
         width: 60;
         max-width: 92%;
         height: 90%;
         max-height: 90%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #set-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #set-body {
         width: 100%;
@@ -2969,23 +2754,10 @@ class ArchiveScreen(ModalScreen[tuple | None]):
     """Archivio completati: ripristina singoli o tutti."""
 
     CSS = """
-    ArchiveScreen {
-        align: center middle;
-    }
     #arc-box {
         width: 64;
         max-width: 92%;
         max-height: 88%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #arc-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #arc-list {
         height: auto;
@@ -3061,23 +2833,10 @@ class RestoreScreen(ModalScreen[str | None]):
     """Sceglie uno snapshot da ripristinare."""
 
     CSS = """
-    RestoreScreen {
-        align: center middle;
-    }
     #rst-box {
         width: 64;
         max-width: 92%;
         max-height: 88%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #rst-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
     }
     #rst-list {
         height: auto;
@@ -3089,11 +2848,6 @@ class RestoreScreen(ModalScreen[str | None]):
         min-width: 16;
         height: 3;
         margin-bottom: 1;
-    }
-    #rst-close {
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 
@@ -3146,22 +2900,9 @@ class WelcomeScreen(ModalScreen[str | None]):
     """Benvenuto con scelta demo/vuoto (solo al primo avvio senza task)."""
 
     CSS = """
-    WelcomeScreen {
-        align: center middle;
-    }
     #wel-box {
         width: 60;
         max-width: 92%;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #wel-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
         height: auto;
     }
     #wel-body {
@@ -3211,9 +2952,6 @@ class LockScreen(ModalScreen[bool]):
     """Blocco password all'avvio (solo se dati cifrati)."""
 
     CSS = """
-    LockScreen {
-        align: center middle;
-    }
     #lock-box {
         width: 52;
         max-width: 90%;
@@ -3317,22 +3055,9 @@ class PasswordScreen(ModalScreen[list[str] | None]):
     """Raccoglie 1-3 password (niente logica: valida il chiamante)."""
 
     CSS = """
-    PasswordScreen {
-        align: center middle;
-    }
     #pw-box {
         width: 52;
         max-width: 90%;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #pw-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
         height: auto;
     }
     #pw-box Input {
@@ -3420,22 +3145,9 @@ class SecurityScreen(ModalScreen[str | None]):
     """Stato cifratura + azioni (dismiss 'enable'/'change'/'disable'/None)."""
 
     CSS = """
-    SecurityScreen {
-        align: center middle;
-    }
     #sec-box {
         width: 56;
         max-width: 92%;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #sec-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
         height: auto;
     }
     #sec-status {
@@ -3506,16 +3218,10 @@ class HealthScreen(ModalScreen[None]):
     """Salute progetti: avanzamento, ritardi, momentum, verdetto."""
 
     CSS = """
-    HealthScreen {
-        align: center middle;
-    }
     #hea-box {
         width: 64;
         max-width: 92%;
         max-height: 88%;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
     }
     #hea-title {
         text-align: center;
@@ -3534,11 +3240,6 @@ class HealthScreen(ModalScreen[None]):
         height: auto;
         max-height: 22;
         margin-bottom: 1;
-    }
-    #hea-close {
-        width: 100%;
-        min-width: 16;
-        height: 3;
     }
     """
 

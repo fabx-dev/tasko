@@ -6,11 +6,8 @@ from datetime import datetime
 
 from src.lang import T
 from src.models import Priority, TodoItem, _is_valid_date, _normalize_date
-from src.storage import load_todos, save_todos
-
-
-def _cli_next_id(todos: list[TodoItem]) -> int:
-    return max((t.id or 0 for t in todos), default=0) + 1
+from src.storage import load_todos
+from src.store import TodoStore
 
 
 def _cli_parse_priority(value: str | None) -> Priority:
@@ -82,17 +79,16 @@ def _cli_main(argv: list[str]) -> int:
         if args.due and not _is_valid_date(due):
             err(T("cli_bad_date", d=args.due))
             return 2
-        todos = load_todos()
+        store = TodoStore.load()
         todo = TodoItem(
             title=args.title.strip(),
             priority=_cli_parse_priority(args.priority),
             due=due,
             project=(args.project or "").strip().lower(),
             tags=[t.strip().lower() for t in (args.tags or "").split(",") if t.strip()],
-            todo_id=_cli_next_id(todos),
         )
-        todos.append(todo)
-        save_todos(todos)
+        store.add(todo)
+        store.commit()
         print(todo.id)
         return 0
 
@@ -128,12 +124,12 @@ def _cli_main(argv: list[str]) -> int:
                 )
         return 0
 
-    todos = load_todos()
-    todo = next((t for t in todos if t.id == args.id), None)
-    if todo is None:
-        err(T("cli_notfound", id=args.id))
-        return 1
     if args.cmd == "done":
+        store = TodoStore.load()
+        todo = store.by_id(args.id)
+        if todo is None:
+            err(T("cli_notfound", id=args.id))
+            return 1
         if todo.done:
             print(todo.id)
             return 0
@@ -141,9 +137,14 @@ def _cli_main(argv: list[str]) -> int:
         todo.paused = False
         todo.planned_for = ""
         todo.completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
-        save_todos(todos)
+        store.commit()
         print(todo.id)
         return 0
+    todos = load_todos()
+    todo = next((t for t in todos if t.id == args.id), None)
+    if todo is None:
+        err(T("cli_notfound", id=args.id))
+        return 1
     # show
     lines = [
         f"#{todo.id} {todo.title}",

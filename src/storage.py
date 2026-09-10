@@ -36,6 +36,112 @@ def state_readable() -> bool:
     return True
 
 
+class StorageLocked(OSError):
+    """Altro processo detiene il lock oltre il timeout."""
+
+
+LOCK_TIMEOUT = 10.0
+
+
+def _locked(path: Path, timeout: float = LOCK_TIMEOUT):
+    """Lock esclusivo inter-processo (fcntl) con timeout.
+
+    Il kernel rilascia il lock alla morte del processo: niente lock stali.
+    Solleva StorageLocked se scade il timeout.
+    """
+    import contextlib
+    import fcntl
+    import os
+    import time
+
+    @contextlib.contextmanager
+    def _acquire():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = path.parent / (path.name + ".lock")
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            deadline = time.monotonic() + timeout
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise StorageLocked(f"File occupato oltre timeout: {path.name}")
+                    time.sleep(0.05)
+            yield
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+            os.close(fd)
+
+    return _acquire()
+
+
+def _write_locked(path: Path, text: str, with_bak: bool = False) -> None:
+    """Scrittura atomica tmp+fsync+replace. Il chiamante detiene il lock."""
+    import os
+    import shutil
+
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    if with_bak and path.exists():
+        try:
+            shutil.copy2(path, path.with_suffix(".bak.json"))
+        except OSError:
+            pass
+    tmp.replace(path)
+
+
+def _write_atomic(path: Path, text: str, with_bak: bool = False) -> None:
+    """Scrittura atomica sotto lock esclusivo."""
+    with _locked(path):
+        _write_locked(path, text, with_bak=with_bak)
+
+
+def _is_locked_no_key(path: Path) -> bool:
+    """True se il file e' un envelope cifrato e non abbiamo la chiave in RAM."""
+    if _crypto.is_unlocked():
+        return False
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    try:
+        return _crypto.is_envelope(text)
+    except Exception:
+        return False
+
+
+def _read_dict_list(path: Path) -> list[dict]:
+    """Dict grezzi dal file. Mancante -> []. Corrotto -> backup .corrotto + [].
+    Bloccato (cifrato senza chiave) -> [] SENZA backup: non e' corrotto."""
+    if not path.exists():
+        return []
+    try:
+        data = _read_state_file(path)
+    except (json.JSONDecodeError, OSError, ValueError):
+        if _is_locked_no_key(path):
+            return []
+        backup = path.with_suffix(".corrotto.json")
+        try:
+            backup.write_bytes(path.read_bytes())
+        except OSError:
+            pass
+        return []
+    if not isinstance(data, list):
+        return []
+    return [d for d in data if isinstance(d, dict)]
+
+
 def _home() -> Path:
     """Base dati: TASKO_HOME se impostata (test/automazioni), altrimenti home reale."""
     import os
@@ -52,23 +158,8 @@ DATA_FILE = _home() / ".todo_app.json"
 
 
 def load_todos() -> list[TodoItem]:
-    if not DATA_FILE.exists():
-        return []
-    try:
-        data = _read_state_file(DATA_FILE)
-    except (json.JSONDecodeError, OSError, ValueError):
-        backup = DATA_FILE.with_suffix(".corrotto.json")
-        try:
-            backup.write_bytes(DATA_FILE.read_bytes())
-        except OSError:
-            pass
-        return []
-    if not isinstance(data, list):
-        return []
     todos: list[TodoItem] = []
-    for item in data:
-        if not isinstance(item, dict):
-            continue
+    for item in _read_dict_list(DATA_FILE):
         try:
             todos.append(TodoItem.from_dict(item))
         except Exception:
@@ -77,24 +168,91 @@ def load_todos() -> list[TodoItem]:
 
 
 def save_todos(todos: list[TodoItem]) -> None:
-    import os
-    import shutil
+    """Scrittura semplice sotto lock (nessun merge). Per merge usare lo store."""
+    _write_atomic(
+        DATA_FILE,
+        _dump_state_text([t.to_dict() for t in todos]),
+        with_bak=True,
+    )
 
-    tmp = DATA_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(_dump_state_text([t.to_dict() for t in todos]))
-        f.flush()
-        try:
-            os.fsync(f.fileno())
-        except OSError:
-            pass
-    # Backup dell'ultima versione valida prima di sovrascrivere.
-    if DATA_FILE.exists():
-        try:
-            shutil.copy2(DATA_FILE, DATA_FILE.with_suffix(".bak.json"))
-        except OSError:
-            pass
-    tmp.replace(DATA_FILE)
+
+def _dicts_by_id(dicts: list[dict]) -> tuple[dict[int, dict], list[dict]]:
+    by_id: dict[int, dict] = {}
+    noids: list[dict] = []
+    for d in dicts:
+        if isinstance(d, dict) and isinstance(d.get("id"), int):
+            by_id[d["id"]] = d
+        elif isinstance(d, dict):
+            noids.append(d)
+    return by_id, noids
+
+
+_MISSING = object()
+
+
+def merge_todo_dicts(
+    base: list[dict], disk: list[dict], ours: list[dict]
+) -> list[dict]:
+    """Merge three-way per id: base=ultimo stato sincronizzato,
+    disk=contenuto attuale su disco, ours=memoria.
+
+    - nuovi da entrambi i lati: unione;
+    - stesso id modificato da un solo lato: vince quel lato;
+    - modificato da entrambi: vinciamo noi (chi salva);
+    - cancellato da un lato ma modificato dall'altro: vince la modifica;
+    - stesso id creato da entrambi con contenuti diversi: disco tiene l'id,
+      il nostro viene riassegnato.
+    """
+    base_by, _ = _dicts_by_id(base)
+    disk_by, disk_no = _dicts_by_id(disk)
+    ours_by, ours_no = _dicts_by_id(ours)
+    ids = list(ours_by) + [i for i in disk_by if i not in ours_by]
+    fresh = max(list(ours_by) + list(disk_by) + list(base_by), default=0) + 1
+    merged: dict[int, dict] = {}
+    for i in ids:
+        b = base_by.get(i, _MISSING)
+        k = disk_by.get(i, _MISSING)
+        o = ours_by.get(i, _MISSING)
+        if o is not _MISSING and k is _MISSING:
+            merged[i] = o  # nuovo nostro, o cancellato da loro (teniamo il nostro)
+        elif o is _MISSING and k is not _MISSING:
+            if b is _MISSING:
+                merged[i] = k  # nuovo loro
+            elif k != b:
+                merged[i] = k  # cancellato da noi ma modificato da loro
+            # else: cancellato da noi, loro intonsi -> resta cancellato
+        elif o is not _MISSING and k is not _MISSING:
+            if b is _MISSING:
+                if o == k:
+                    merged[i] = o
+                else:
+                    merged[i] = k  # collisione: disco tiene l'id...
+                    d = dict(o)
+                    d["id"] = fresh  # ...noi riassegnati
+                    fresh += 1
+                    merged[d["id"]] = d
+            elif o == b:
+                merged[i] = k
+            elif k == b:
+                merged[i] = o
+            else:
+                merged[i] = o  # entrambi modificato: vince chi salva
+        # else: cancellato da entrambi -> niente
+    out = list(merged.values())
+    out.extend(ours_no)
+    out.extend(disk_no)
+    return out
+
+
+def save_todos_synced(current: list[dict], base: list[dict]) -> list[dict]:
+    """Merge three-way sotto lock unico (lettura+merge+scrittura atomici).
+
+    Ritorna i dict effettivamente scritti (merged)."""
+    with _locked(DATA_FILE):
+        disk = _read_dict_list(DATA_FILE)
+        merged = merge_todo_dicts(base, disk, current)
+        _write_locked(DATA_FILE, _dump_state_text(merged), with_bak=True)
+        return merged
 
 
 TEMPLATE_FILE = _home() / ".todo_templates.json"
@@ -179,8 +337,6 @@ def load_templates() -> dict[str, list[dict]]:
 
 
 def save_templates(templates: dict[str, list[dict]]) -> None:
-    import os
-
     serializable = {
         name: [
             {
@@ -193,15 +349,7 @@ def save_templates(templates: dict[str, list[dict]]) -> None:
         ]
         for name, items in templates.items()
     }
-    tmp = TEMPLATE_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(_dump_state_text(serializable))
-        f.flush()
-        try:
-            os.fsync(f.fileno())
-        except OSError:
-            pass
-    tmp.replace(TEMPLATE_FILE)
+    _write_atomic(TEMPLATE_FILE, _dump_state_text(serializable))
 
 
 TEMPLATES: dict[str, list[dict]] = load_templates()
@@ -269,8 +417,6 @@ def load_config() -> dict:
 
 
 def save_config(cfg: dict) -> None:
-    import os
-
     payload = {
         "theme": str(cfg.get("theme", DEFAULT_CONFIG["theme"])),
         "kanban_visible": bool(cfg.get("kanban_visible", True)),
@@ -287,15 +433,7 @@ def save_config(cfg: dict) -> None:
         if str(cfg.get("lang", "auto")).lower() in ("auto", "it", "en")
         else "auto",
     }
-    tmp = CONFIG_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False)
-        f.flush()
-        try:
-            os.fsync(f.fileno())
-        except OSError:
-            pass
-    tmp.replace(CONFIG_FILE)
+    _write_atomic(CONFIG_FILE, json.dumps(payload, indent=2, ensure_ascii=False))
 
 
 ARCHIVE_FILE = _home() / ".todo_archive.json"
@@ -312,17 +450,7 @@ def load_archive() -> list[dict]:
 
 
 def save_archive(items: list[dict]) -> None:
-    import os
-
-    tmp = ARCHIVE_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(_dump_state_text(items))
-        f.flush()
-        try:
-            os.fsync(f.fileno())
-        except OSError:
-            pass
-    tmp.replace(ARCHIVE_FILE)
+    _write_atomic(ARCHIVE_FILE, _dump_state_text(items))
 
 
 BACKUP_DIR = _home() / "Tasko_backups"
@@ -491,8 +619,6 @@ def load_pomodoro() -> dict:
 
 
 def save_pomodoro(state: dict) -> None:
-    import os
-
     payload = {
         "default_minutes": _clamp_int(state.get("default_minutes", 25), 25, 1, 180),
         "short_minutes": _clamp_int(state.get("short_minutes", 5), 5, 1, 60),
@@ -503,12 +629,4 @@ def save_pomodoro(state: dict) -> None:
         if isinstance(state.get("session"), dict)
         else None,
     }
-    tmp = POMODORO_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(_dump_state_text(payload))
-        f.flush()
-        try:
-            os.fsync(f.fileno())
-        except OSError:
-            pass
-    tmp.replace(POMODORO_FILE)
+    _write_atomic(POMODORO_FILE, _dump_state_text(payload))

@@ -1,0 +1,105 @@
+"""Test TodoStore: id, lookup, mutazioni, commit unico."""
+
+import src.main as m
+from src.store import TodoStore
+from tests.conftest import make_app, make_todo
+
+
+def test_add_assegna_id_sequenziali():
+    s = TodoStore()
+    a = s.add(make_todo("A", todo_id=None))
+    b = s.add(make_todo("B", todo_id=None))
+    assert (a.id, b.id) == (1, 2)
+    assert s.next_id == 3
+
+
+def test_add_tiene_id_libero_riassegna_collisioni():
+    s = TodoStore([make_todo("A", todo_id=5)])
+    libero = s.add(make_todo("B", todo_id=7))
+    assert libero.id == 7
+    doppio = s.add(make_todo("C", todo_id=5))
+    assert doppio.id == 8  # 5 occupato -> nuovo id
+    assert s.next_id == 9
+
+
+def test_allocate_consuma():
+    s = TodoStore([make_todo("A", todo_id=3)])
+    assert s.allocate_id() == 4
+    assert s.next_id == 5
+
+
+def test_lookup_e_gerarchia():
+    s = TodoStore(
+        [
+            make_todo("P", todo_id=1),
+            make_todo("F1", todo_id=2, parent_id=1),
+            make_todo("F2", todo_id=3, parent_id=1),
+            make_todo("N", todo_id=4, parent_id=2),
+            make_todo("Orfano", todo_id=5, parent_id=999),
+        ]
+    )
+    assert s.by_id(2).title == "F1"
+    assert s.by_id(999) is None and s.by_id(None) is None
+    assert not s.has_id(999) and s.has_id(1)
+    assert [t.id for t in s.children(1)] == [2, 3]
+    assert [t.id for t in s.descendants(1)] == [2, 4, 3]
+    assert s.depth(s.by_id(4)) == 2
+    assert s.depth(s.by_id(1)) == 0
+    assert s.depth(s.by_id(5)) == 0  # parent mancante: si ferma
+
+
+def test_remove_ids_ordine_e_indice():
+    s = TodoStore([make_todo("A", todo_id=1), make_todo("B", todo_id=2), make_todo("C", todo_id=3)])
+    removed = s.remove_ids({3, 1})
+    assert [t.title for t in removed] == ["A", "C"]
+    assert [t.title for t in s.all()] == ["B"]
+    assert s.by_id(1) is None and s.by_id(2).title == "B"
+    assert s.next_id == 4  # il contatore non arretra mai
+
+
+def test_replace_all_reindicizza():
+    s = TodoStore([make_todo("A", todo_id=1)])
+    s.replace_all([make_todo("X", todo_id=10), make_todo("Y", todo_id=20)])
+    assert s.by_id(10).title == "X" and s.by_id(1) is None
+    assert s.next_id == 21
+
+
+def test_commit_e_reload_tmp(tmp_files):
+    s = TodoStore([make_todo("A", todo_id=1, project="lav")])
+    s.commit()
+    assert [t.title for t in TodoStore.load().all()] == ["A"]
+    # modifica esterna -> reload la vede
+    m.save_todos([make_todo("B", todo_id=2)])
+    s.reload()
+    assert [t.title for t in s.all()] == ["B"]
+    assert s.next_id == 3
+
+
+def test_app_todos_e_next_id_restano_sincronizzati(tmp_files):
+    app = make_app([make_todo("A", todo_id=1)])
+    assert app.next_id == 2 and app.store.by_id(1).title == "A"
+    app.todos = [make_todo("X", todo_id=9)]
+    assert app.store.by_id(9).title == "X" and app.next_id == 10
+    app.next_id = 50
+    assert app.store.allocate_id() == 50
+
+
+def test_app_save_data_scrive_lo_store(tmp_files):
+    app = make_app([make_todo("A", todo_id=1)])
+    app.store.add(make_todo("B", todo_id=None))
+    app._save_data()
+    assert [t.title for t in m.load_todos()] == ["A", "B"]
+
+
+def test_undo_con_collisione_riassegna(tmp_files):
+    import asyncio
+
+    async def t():
+        app = make_app([make_todo("A", todo_id=1)])
+        async with app.run_test(size=(120, 40)):
+            app._undo_stack.append([make_todo("A2", todo_id=1)])  # id collides
+            app.action_undo_delete()
+            assert sorted(t.title for t in app.todos) == ["A", "A2"]
+            assert sorted(t.id for t in app.todos) == [1, 2]
+
+    asyncio.run(t())

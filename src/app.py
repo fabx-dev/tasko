@@ -72,16 +72,15 @@ from src.storage import (
     load_config,
     load_pomodoro,
     load_templates,
-    load_todos,
     restore_snapshot,
     save_archive,
     save_config,
     save_pomodoro,
     save_templates,
-    save_todos,
     snapshot_info,
     state_readable,
 )
+from src.store import TodoStore
 
 
 class ClickableDataTable(DataTable):
@@ -250,6 +249,40 @@ class TodoApp(App):
     Footer {
         padding-left: 1;
     }
+    /* Shell modali condivisa: stesse regole di prima, un solo punto.
+       (Dichiarazioni spostate dalle 27 screen: root, box, titoli, chiudi.) */
+    ModalScreen {
+        align: center middle;
+    }
+    #state-box, #theme-box, #search-box, #week-box, #tpl-box, #tplc-box,
+    #tplp-box, #impcsv-box, #pomo-box, #kb-box, #detail-box, #day-box,
+    #calendar-box, #plan-box, #goals-box, #stats-box, #keys-box, #set-box,
+    #arc-box, #rst-box, #wel-box, #pw-box, #sec-box, #hea-box, #rev-box {
+        border: thick $primary;
+        background: $surface;
+        padding: 1 2;
+    }
+    #tpl-title, #tplc-title, #tplp-title, #impcsv-title, #goals-title,
+    #keys-title, #set-title, #arc-title, #rst-title, #wel-title,
+    #pw-title, #sec-title, #rev-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+        height: auto;
+    }
+    #theme-close, #kb-close, #day-close, #calendar-close, #plan-close,
+    #stats-close {
+        width: 100%;
+        min-width: 16;
+        height: 3;
+        margin-top: 1;
+    }
+    #week-close, #tplp-close, #keys-close, #rst-close, #hea-close {
+        width: 100%;
+        min-width: 16;
+        height: 3;
+    }
     """
 
     BINDINGS = [
@@ -351,7 +384,7 @@ class TodoApp(App):
                 self.theme = self.config["theme"]
         except Exception:
             pass
-        self.todos: list[TodoItem] = self._load_data()
+        self.store = TodoStore.load()
         self.templates: dict[str, list[dict]] = load_templates()
         self.filter_state: str | None = self.config.get("filter_state", "attivo")
         if self.filter_state not in FILTER_STATES:
@@ -359,10 +392,8 @@ class TodoApp(App):
         self.filter_tag: str | None = None
         self.filter_project: str | None = None
         self.filter_search: str = ""
-        self.next_id = max((t.id or 0 for t in self.todos), default=0) + 1
         self._row_map: list[TodoItem] = []
         self._undo_stack: list[list[TodoItem]] = []
-        self._trash: list[TodoItem] = []
         self._reminded: set[tuple] = set()
         self.focus_task_id: int | None = None
         self.focus_end: datetime | None = None
@@ -394,11 +425,25 @@ class TodoApp(App):
             finally:
                 self.theme = orig_theme
 
-    def _load_data(self) -> list[TodoItem]:
-        return load_todos()
+    @property
+    def todos(self) -> list[TodoItem]:
+        """Compat: lista live dallo store (solo lettura; mutare via store)."""
+        return self.store.all()
+
+    @todos.setter
+    def todos(self, value: list[TodoItem]) -> None:
+        self.store.replace_all(value)
+
+    @property
+    def next_id(self) -> int:
+        return self.store.next_id
+
+    @next_id.setter
+    def next_id(self, value: int) -> None:
+        self.store.next_id = value
 
     def _save_data(self) -> None:
-        save_todos(self.todos)
+        self.store.commit()
 
     def _save_config(self) -> None:
         try:
@@ -475,8 +520,7 @@ class TodoApp(App):
         self.config["onboarded"] = True
         self._save_config()
         if choice == "demo":
-            self.todos = _demo_todos(self.next_id)
-            self.next_id = max((t.id or 0 for t in self.todos), default=0) + 1
+            self.store.replace_all(_demo_todos(self.store.next_id))
             self._save_data()
             self._populate_table()
             self.notify(T("n_welcome_demo"))
@@ -605,26 +649,13 @@ class TodoApp(App):
         return sorted(parents, key=self._sort_key)
 
     def _get_subtasks(self, parent_id: int) -> list[TodoItem]:
-        return [t for t in self.todos if t.parent_id == parent_id]
+        return self.store.children(parent_id)
 
     def _get_depth(self, todo: TodoItem) -> int:
-        depth = 0
-        current = todo
-        while current.parent_id is not None:
-            parent = next((t for t in self.todos if t.id == current.parent_id), None)
-            if parent is None:
-                break
-            depth += 1
-            current = parent
-        return depth
+        return self.store.depth(todo)
 
     def _get_all_descendants(self, todo_id: int) -> list[TodoItem]:
-        result = []
-        for t in self.todos:
-            if t.parent_id == todo_id:
-                result.append(t)
-                result.extend(self._get_all_descendants(t.id))
-        return result
+        return self.store.descendants(todo_id)
 
     def _populate_table(self) -> None:
         table = self.query_one("#todo-table", DataTable)
@@ -747,10 +778,9 @@ class TodoApp(App):
                     tags=result["tags"],
                     project=result.get("project", ""),
                     stima_pomo=result.get("stima_pomo", 0),
-                    todo_id=self.next_id,
+                    todo_id=self.store.allocate_id(),
                 )
-                self.next_id += 1
-                self.todos.append(todo)
+                self.store.add(todo)
                 self._save_data()
                 self._populate_table()
                 self.notify(T("n_added", t=todo.title))
@@ -804,12 +834,8 @@ class TodoApp(App):
         def on_confirm(confirmed: bool) -> None:
             if confirmed:
                 desc_ids = {d.id for d in descendants}
-                removed = [t for t in self.todos if t.id == todo.id or t.id in desc_ids]
+                removed = self.store.remove_ids({todo.id} | desc_ids)
                 self._undo_stack.append(removed)
-                self._trash.extend(removed)
-                self.todos = [
-                    t for t in self.todos if t.id != todo.id and t.id not in desc_ids
-                ]
                 self._save_data()
                 self._populate_table()
                 self.notify(T("n_deleted", t=todo.title))
@@ -864,10 +890,9 @@ class TodoApp(App):
                     recurrence=todo.recurrence,
                     tags=list(todo.tags),
                     project=todo.project,
-                    todo_id=self.next_id,
+                    todo_id=self.store.allocate_id(),
                 )
-                self.next_id += 1
-                self.todos.append(new_todo)
+                self.store.add(new_todo)
                 self.notify(T("n_recur", t=new_todo.title, d=new_due))
         self._save_data()
         self._populate_table()
@@ -894,14 +919,13 @@ class TodoApp(App):
                     due=result["due"],
                     notes=result["notes"],
                     parent_id=parent_id,
-                    todo_id=self.next_id,
+                    todo_id=self.store.allocate_id(),
                     recurrence=result["recurrence"],
                     tags=result["tags"],
                     project=result.get("project", "") or parent_project,
                     stima_pomo=result.get("stima_pomo", 0),
                 )
-                self.next_id += 1
-                self.todos.append(sub)
+                self.store.add(sub)
                 self._save_data()
                 self._populate_table()
                 self.notify(T("n_sub_added", s=sub.title, p=parent_title))
@@ -1128,7 +1152,7 @@ class TodoApp(App):
         return self.focus_phase in ("short", "long")
 
     def _pomodoro_text(self) -> str:
-        todo = next((t for t in self.todos if t.id == self.focus_task_id), None)
+        todo = self.store.by_id(self.focus_task_id)
         name = todo.title[:28] if todo else f"#{self.focus_task_id}"
         plbl = _pomo_label(todo) if todo else ""
         total = f" ({plbl})" if plbl else ""
@@ -1178,7 +1202,7 @@ class TodoApp(App):
     def _pomodoro_state(self) -> dict:
         if self.focus_task_id is None:
             return {"empty": True}
-        todo = next((t for t in self.todos if t.id == self.focus_task_id), None)
+        todo = self.store.by_id(self.focus_task_id)
         secs = self._pomodoro_remaining_secs()
         paused = self.focus_paused_secs is not None
         phase = self.focus_phase or "focus"
@@ -1274,7 +1298,7 @@ class TodoApp(App):
         if not isinstance(session, dict):
             self._update_pomodoro_bar()
             return
-        todo = next((t for t in self.todos if t.id == session.get("task_id")), None)
+        todo = self.store.by_id(session.get("task_id"))
         if todo is None:
             self._save_pomodoro()
             return
@@ -1383,7 +1407,7 @@ class TodoApp(App):
         self.notify(T("n_stopped"))
 
     def _complete_focus(self) -> None:
-        todo = next((t for t in self.todos if t.id == self.focus_task_id), None)
+        todo = self.store.by_id(self.focus_task_id)
         if todo:
             todo.pomodoros += 1
             todo.pomodoro_log.append(datetime.now().strftime("%Y-%m-%d %H:%M"))
@@ -1459,7 +1483,7 @@ class TodoApp(App):
     def _focus_label(self) -> str:
         if self.focus_task_id is None:
             return ""
-        todo = next((t for t in self.todos if t.id == self.focus_task_id), None)
+        todo = self.store.by_id(self.focus_task_id)
         name = todo.title[:20] if todo else f"#{self.focus_task_id}"
         secs = self._pomodoro_remaining_secs()
         if self.focus_paused_secs is not None:
@@ -1521,12 +1545,7 @@ class TodoApp(App):
             self.notify(T("n_nothing"), severity="warning")
             return
         restored = self._undo_stack.pop()
-        for t in restored:
-            if t.id is not None and any(x.id == t.id for x in self.todos):
-                t.id = self.next_id
-                self.next_id += 1
-        self.todos.extend(restored)
-        self._trash = [t for t in self._trash if t not in restored]
+        self.store.add_many(restored)
         self._purge_archive({t.id for t in restored if t.id is not None})
         self._save_data()
         self._populate_table()
@@ -1566,8 +1585,7 @@ class TodoApp(App):
                 self.notify(T("n_arc_err", e=exc), severity="error")
                 return
             self._undo_stack.append(removed)
-            self._trash.extend(removed)
-            self.todos = [t for t in self.todos if t.id not in all_ids]
+            self.store.remove_ids(all_ids)
             self._save_data()
             self._populate_table()
             self.notify(T("n_archived", n=len(removed)))
@@ -1605,10 +1623,7 @@ class TodoApp(App):
                     t = TodoItem.from_dict(d)
                 except Exception:
                     continue
-                if t.id is None or any(x.id == t.id for x in self.todos):
-                    t.id = self.next_id
-                    self.next_id += 1
-                self.todos.append(t)
+                self.store.add(t)
                 restored += 1
             save_archive([])
             self._save_data()
@@ -1627,12 +1642,9 @@ class TodoApp(App):
                 t = TodoItem.from_dict(raw)
             except Exception:
                 return
-            if t.id is None or any(x.id == t.id for x in self.todos):
-                t.id = self.next_id
-                self.next_id += 1
+            self.store.add(t)
             del archive[idx]
             save_archive(archive)
-            self.todos.append(t)
             self._save_data()
             self._populate_table()
             self.notify(T("n_arc_one", t=t.title))
@@ -1671,10 +1683,8 @@ class TodoApp(App):
                 title=item["title"],
                 priority=item.get("priority", Priority.MEDIUM),
                 project=name.lower(),
-                todo_id=self.next_id,
             )
-            self.next_id += 1
-            self.todos.append(todo)
+            self.store.add(todo)
             created.append(todo)
         self._save_data()
         self._populate_table()
@@ -2021,17 +2031,16 @@ class TodoApp(App):
                 completed_at=raw["completed_at"] if raw["done"] else "",
                 pomodoros=raw["pomodoros"],
                 stima_pomo=raw.get("stima_pomo", 0),
-                todo_id=self.next_id,
+                todo_id=self.store.allocate_id(),
             )
             if raw["old_id"] is not None:
-                id_map[raw["old_id"]] = self.next_id
-            self.next_id += 1
+                id_map[raw["old_id"]] = todo.id
             pending_parents.append(raw["old_parent"])
             created.append(todo)
         for todo, old_parent in zip(created, pending_parents):
             if old_parent is not None and old_parent in id_map:
                 todo.parent_id = id_map[old_parent]
-        self.todos.extend(created)
+        self.store.add_many(created)
         return len(created), skipped
 
     def action_edit_goals(self) -> None:
@@ -2157,8 +2166,7 @@ class TodoApp(App):
         self.push_screen(RestoreScreen(snaps[:20]), on_pick)
 
     def _reload_all(self) -> None:
-        self.todos = self._load_data()
-        self.next_id = max((t.id or 0 for t in self.todos), default=0) + 1
+        self.store.reload()
         self.templates = load_templates()
         self.config = load_config()
         try:
@@ -2359,13 +2367,6 @@ class TodoApp(App):
             self.notify(T("n_theme", c=choice))
 
         self.push_screen(ThemeListScreen(themes, self.theme), on_pick)
-
-    def action_toggle_theme(self) -> None:
-        # Retro-compatibilità: ciclo semplice tra i due temi storici.
-        self.theme = "textual-dark" if self.theme == "matrix" else "matrix"
-        self.config["theme"] = self.theme
-        self._save_config()
-        self.notify(T("n_theme", c=self.theme))
 
     def action_save_screenshot(self) -> None:
         try:
