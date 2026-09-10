@@ -315,6 +315,7 @@ class TodoApp(App):
         Binding("ctrl+s", "save_screenshot", "Screenshot", show=False),
         Binding("ctrl+e", "export_data", "Export", show=False),
         Binding("r", "refresh", "Ricarica", show=False),
+        Binding("R", "open_review", "Chiusura", show=False),
         Binding(
             "ctrl+p",
             "command_palette",
