@@ -1970,7 +1970,7 @@ class ReviewScreen(ModalScreen[None]):
 
     CSS = """
     #rev-box {
-        width: 80;
+        width: 100;
         max-width: 95%;
         max-height: 90%;
     }
