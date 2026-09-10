@@ -5,6 +5,17 @@ Entries in English from now on.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-10
+
+### Added
+- Project health view (OK / At risk / Critical) with key and menu entry
+- CLI (`add`, `list`, `done`, `show`) with `TASKO_HOME` isolation
+- Complete Italian/English coverage: all screens, notifications, dates, defaults
+- Due-time reminders polish and fully isolated test fixture
+
+### Fixed
+- Removed useless Maximize entry from menu
+
 ## [0.2.0] - 2026-09-10
 
 ### Added
