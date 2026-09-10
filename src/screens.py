@@ -2234,11 +2234,10 @@ class StatsScreen(ModalScreen[None]):
     #stats-box {
         width: 58;
         max-width: 92%;
-        max-height: 90%;
+        height: 90%;
     }
     #stats-scroll {
-        height: auto;
-        max-height: 22;
+        height: 1fr;
     }
     #stats-title {
         text-align: center;
