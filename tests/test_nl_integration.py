@@ -52,6 +52,28 @@ def test_form_ctrl_l_compila_e_anteprima(tmp_files):
     asyncio.run(t())
 
 
+def test_form_salva_con_s(tmp_files):
+    """Tasto s (terminal-safe) salva come ctrl+enter (focus fuori dai campi)."""
+    from textual.widgets import Button
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            app.screen.query_one("#title-input", Input).value = "Solo titolo"
+            app.screen.query_one("#save-btn", Button).focus()
+            await pilot.press("s")
+            await pilot.pause()
+            await pilot.pause()
+            assert len(app.todos) == 1
+            assert app.todos[0].title == "Solo titolo"
+
+    asyncio.run(t())
+
+
 def test_form_ctrl_l_titolo_vuoto(tmp_files):
     async def t():
         app = make_app([])

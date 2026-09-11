@@ -155,6 +155,7 @@ class TodoFormScreen(ModalScreen[dict | None]):
         Binding("escape", "cancel", "Annulla"),
         Binding("ctrl+enter", "submit", "Salva", show=False),
         Binding("ctrl+l", "fill_nl", "Compila", show=False),
+        Binding("s", "submit", "Salva", show=False),
     ]
 
     def __init__(
@@ -900,6 +901,7 @@ class TemplateCreateScreen(ModalScreen[dict | None]):
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
         Binding("ctrl+enter", "submit", "Salva", show=False),
+        Binding("s", "submit", "Salva", show=False),
     ]
 
     def __init__(self, initial: dict | None = None) -> None:
@@ -1079,6 +1081,7 @@ class ImportCsvScreen(ModalScreen[str | None]):
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
         Binding("ctrl+enter", "submit", "Salva", show=False),
+        Binding("s", "submit", "Salva", show=False),
     ]
 
     def __init__(self, files: list[Path]) -> None:
@@ -2047,6 +2050,7 @@ class ReviewScreen(ModalScreen[None]):
     BINDINGS = [
         Binding("escape", "close", "Chiudi"),
         Binding("ctrl+enter", "confirm", "Conferma", show=False),
+        Binding("s", "confirm", "Conferma", show=False),
     ]
 
     def __init__(
@@ -2218,6 +2222,7 @@ class PlanProposalScreen(ModalScreen[None]):
     BINDINGS = [
         Binding("escape", "close", "Chiudi"),
         Binding("ctrl+enter", "confirm", "Conferma", show=False),
+        Binding("s", "confirm", "Conferma", show=False),
     ]
 
     def __init__(
@@ -2582,6 +2587,7 @@ class GoalsScreen(ModalScreen[dict | None]):
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
         Binding("ctrl+enter", "submit", "Salva", show=False),
+        Binding("s", "submit", "Salva", show=False),
     ]
 
     def __init__(self, daily: int = 5, weekly: int = 25, pomo_daily: int = 8) -> None:
@@ -3201,6 +3207,7 @@ class SettingsScreen(ModalScreen[dict | None]):
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
         Binding("ctrl+enter", "submit", "Salva", show=False),
+        Binding("s", "submit", "Salva", show=False),
     ]
 
     def __init__(self, themes: list[str], current: dict) -> None:
@@ -3678,6 +3685,7 @@ class PasswordScreen(ModalScreen[list[str] | None]):
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
         Binding("ctrl+enter", "submit", "Conferma", show=False),
+        Binding("s", "submit", "Conferma", show=False),
     ]
 
     def __init__(self, title_key: str, fields: list[str], validate=None) -> None:

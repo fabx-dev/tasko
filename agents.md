@@ -70,8 +70,11 @@ Regole dure:
 - **CSS**: shell modali condivisa in `TodoApp.CSS` (sezione "Shell modali condivisa": root
   `ModalScreen`, gruppo 24 box, gruppo 12 titoli, gruppi bottoni chiudi). Nuove screen:
   aggiungere i propri `#x-box`/`#x-title` a quei gruppi, dichiarare in screen solo lo specifico.
-- **Bottoni**: tutti `variant="default"`; coppie azione = `form_save` ("Salva [ctrl+enter]") +
+- **Bottoni**: tutti `variant="default"`; coppie azione = `form_save` ("Salva [s]") +
   `form_cancel` ("Annulla [esc]"); solo visione = `ui_close_esc` ("Chiudi [escape]").
+  `ctrl+enter` resta come binding secondario ma NON affidarti solo a lui: molti terminali
+  (Windows Terminal/WSL) non lo consegnano all'app — `s` funziona ovunque (i campi di
+  testo consumano i caratteri, quindi non scatta mentre digiti).
 - **Tasti globali**: superficie già ampia (~30 binding). Nuovi tasti solo su richiesta esplicita;
   preferire palette/menu. Convenzione maiuscole = variante (`b/B`, `o/O`, `r` ricarica / `R` review;
   eccezione approvata: `P` = piano smart, coppia di `p` = piano giorno).

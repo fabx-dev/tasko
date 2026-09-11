@@ -151,6 +151,27 @@ def test_piano_completo_e_additivo(tmp_files):
     asyncio.run(t())
 
 
+def test_conferma_con_s(tmp_files):
+    """Tasto s (terminal-safe) conferma come ctrl+enter."""
+
+    async def t():
+        app = make_app(_todos())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            await pilot.press("s")
+            await pilot.pause()
+            await pilot.pause()
+            today = _day(0)
+            by_id = {t.id: t for t in app.todos}
+            assert by_id[1].planned_for == today
+            assert by_id[2].planned_for == today
+
+    asyncio.run(t())
+
+
 def test_menu_palette_e_settings_ore(tmp_files):
     names = [action for _t, _h, action in commands_module.TaskoMenuProvider.MENU_IT]
     assert "action_plan_day" in names
