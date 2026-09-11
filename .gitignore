@@ -15,5 +15,7 @@ venv/
 # Screenshot/export locali
 Tasko_screenshots/
 Tasko_backups/
+# Documenti personali (mai nel repo)
+tasko-ai-scope.pdf
 # Sistema
 .DS_Store
