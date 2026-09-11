@@ -67,7 +67,7 @@ def test_m_apre_menu_e_ctrl_p_resta_palette(tmp_files):
     actions = {b.key: b.action for b in type(make_app([make_todo("A")])).BINDINGS}
     assert actions.get("m") == "open_menu"
     assert actions.get("ctrl+p") == "command_palette"
-    assert type(make_app([make_todo("A")])).COMMAND_PALETTE_BINDING == "ctrl+p"
+    assert type(make_app([make_todo("A")])).COMMAND_PALETTE_BINDING == "m"
 
 
 def _row_text(w):

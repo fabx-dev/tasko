@@ -258,6 +258,11 @@ class TodoApp(App):
     Footer {
         padding-left: 1;
     }
+    /* Voce palette nel footer (tasto m): chiave rossa + hamburger. */
+    FooterKey.-command-palette > .footer-key--key {
+        color: $text;
+        background: $error;
+    }
     /* Shell modali condivisa: stesse regole di prima, un solo punto.
        (Dichiarazioni spostate dalle 27 screen: root, box, titoli, chiudi.) */
     ModalScreen {
@@ -336,7 +341,7 @@ class TodoApp(App):
         Binding("m", "open_menu", T("b_menu"), show=False, tooltip=T("menu_tooltip")),
     ]
 
-    COMMAND_PALETTE_BINDING = "ctrl+p"
+    COMMAND_PALETTE_BINDING = "m"
 
     COMMANDS = App.COMMANDS | {TaskoMenuProvider}
 
