@@ -12,6 +12,8 @@ from textual.widgets import (
     Button,
     Input,
     Label,
+    ListItem,
+    ListView,
     Select,
     SelectionList,
     Static,
@@ -1831,7 +1833,7 @@ class DailyPlanScreen(ModalScreen[None]):
     #plan-box {
         width: 80;
         max-width: 95%;
-        max-height: 90%;
+        height: 90%;
     }
     #plan-title {
         text-align: center;
@@ -1840,8 +1842,7 @@ class DailyPlanScreen(ModalScreen[None]):
         margin-bottom: 1;
     }
     #plan-section {
-        height: auto;
-        max-height: 20;
+        height: 1fr;
         margin-bottom: 1;
     }
     #plan-legend {
@@ -1905,6 +1906,14 @@ class DailyPlanScreen(ModalScreen[None]):
             if t.state == "attivo" and not t.due and not t.planned_for
         ]
 
+    @staticmethod
+    def _row(t: TodoItem, marker: str, extra: str = "") -> str:
+        plbl = _pomo_label(t)
+        pomo = f" [red]{plbl}[/]" if plbl else ""
+        return (
+            f"  [cyan]{marker}[/] {_status(t)} {t.title}{extra}  [dim]#{t.id}[/]{pomo}"
+        )
+
     def compose(self) -> ComposeResult:
         today_display = _format_date_it(self.today)
         with Vertical(id="plan-box"):
@@ -1915,98 +1924,108 @@ class DailyPlanScreen(ModalScreen[None]):
             due = self._due_today()
             overdue = self._overdue()
             unplanned = self._unplanned()
-            lines = []
-
-            def _row(t: TodoItem, marker: str, extra: str = "") -> str:
-                plbl = _pomo_label(t)
-                pomo = f" [red]{plbl}[/]" if plbl else ""
-                return f"  [cyan]{marker}[/] {_status(t)} {t.title}{extra}  [dim]#{t.id}[/]{pomo}"
-
+            load = ""
             if planned:
                 load_f = sum(t.pomodoros for t in planned)
                 load_s = sum(getattr(t, "stima_pomo", 0) or 0 for t in planned)
                 load = T("plan_load", f=load_f, s=load_s) if load_s else ""
-                lines.append(T("plan_sec_planned", load=load))
-                lines.extend(_row(t, "x") for t in planned)
-            if due:
-                lines.append(T("plan_sec_due"))
-                lines.extend(_row(t, "+") for t in due)
-            if overdue:
-                lines.append(T("plan_sec_overdue"))
-                lines.extend(
-                    _row(t, "+", T("plan_overdue_row", due=t.due)) for t in overdue
-                )
-            if unplanned:
-                lines.append(T("plan_sec_unplanned"))
-                lines.extend(_row(t, "+") for t in unplanned)
-            if not lines:
-                lines.append(T("plan_empty"))
-            with VerticalScroll(id="plan-section"):
-                for line in lines:
-                    yield Static(line)
+            sections = [
+                (T("plan_sec_planned", load=load), "planned", planned, "x"),
+                (T("plan_sec_due"), "due", due, "+"),
+                (T("plan_sec_overdue"), "overdue", overdue, "+"),
+                (T("plan_sec_unplanned"), "unplanned", unplanned, "+"),
+            ]
+            items = [t for _h, _k, todos, _m in sections for t in todos]
+            if items:
+                keep = getattr(self, "_keep_id", None)
+                children = []
+                found_keep: int | None = None
+                for header, kind, todos, marker in sections:
+                    if not todos:
+                        continue
+                    children.append(ListItem(Label(header), disabled=True))
+                    for t in todos:
+                        extra = (
+                            T("plan_overdue_row", due=t.due)
+                            if kind == "overdue"
+                            else ""
+                        )
+                        row = ListItem(Label(self._row(t, marker, extra)))
+                        row.task_id = t.id
+                        row.section = kind
+                        if found_keep is None and t.id == keep:
+                            found_keep = len(children)
+                        children.append(row)
+                initial = found_keep if found_keep is not None else 1
+                yield ListView(*children, id="plan-section", initial_index=initial)
+            else:
+                yield Static(T("plan_empty"))
             yield Static(T("plan_legend"), id="plan-legend")
             yield Button(T("ui_close_esc"), id="plan-close", variant="default")
 
     def on_mount(self) -> None:
-        self.focus()
+        try:
+            self.query_one("#plan-section", ListView).focus()
+        except Exception:
+            self.focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "plan-close":
             self.dismiss()
 
-    def _is_overdue(self, t: TodoItem) -> bool:
-        if t.state != "attivo" or not t.due or t.planned_for == self.today:
-            return False
+    def _current(self) -> tuple:
+        """(task_id, sezione) della riga evidenziata, o (None, None)."""
         try:
-            d = datetime.strptime(_due_date_part(t.due), "%Y-%m-%d").date()
-            today_d = datetime.strptime(self.today, "%Y-%m-%d").date()
-        except ValueError:
-            return False
-        return d < today_d
+            item = self.query_one("#plan-section", ListView).highlighted_child
+        except Exception:
+            return None, None
+        if item is None:
+            return None, None
+        return getattr(item, "task_id", None), getattr(item, "section", None)
 
-    def action_add_planned(self) -> None:
-        candidates = [
-            t
-            for t in self.all_todos
-            if t.state == "attivo"
-            and t.planned_for != self.today
-            and (
-                _due_date_part(t.due) == self.today or not t.due or self._is_overdue(t)
-            )
-        ]
-        # Priorità: in ritardo e in scadenza prima, poi senza scadenza
-        candidates.sort(
-            key=lambda t: (
-                t.due != self.today and not self._is_overdue(t),
-                t.due or "9999",
-            )
-        )
-        if not candidates:
-            self.notify(T("n_plan_add_none"))
-            return
-        t = candidates[0]
-        t.planned_for = self.today
+    def _refresh_keep(self, task_id=None) -> None:
+        self._keep_id = task_id
         self.on_change()
         self.refresh(recompose=True)
-        self.notify(T("n_plan_added", t=t.title))
+
+    def action_add_planned(self) -> None:
+        tid, section = self._current()
+        if tid is None or section not in ("due", "overdue", "unplanned"):
+            self.notify(T("n_plan_noop"), severity="warning")
+            return
+        todo = next(
+            (t for t in self.all_todos if t.id == tid and t.state == "attivo"), None
+        )
+        if todo is None:
+            self.notify(T("n_plan_noop"), severity="warning")
+            return
+        todo.planned_for = self.today
+        self._refresh_keep(tid)
+        self.notify(T("n_plan_added", t=todo.title))
 
     def action_remove_planned(self) -> None:
+        tid, section = self._current()
+        if tid is None or section != "planned":
+            self.notify(T("n_plan_noop"), severity="warning")
+            return
         for t in self.all_todos:
-            if t.planned_for == self.today and t.state == "attivo":
+            if t.id == tid and t.planned_for == self.today and t.state == "attivo":
                 t.planned_for = ""
-                self.on_change()
-                self.refresh(recompose=True)
+                self._refresh_keep(tid)
                 return
-        self.notify(T("n_plan_rm_none"))
+        self.notify(T("n_plan_rm_none"), severity="warning")
 
     def action_toggle_done(self) -> None:
+        tid, section = self._current()
+        if tid is None or section != "planned":
+            self.notify(T("n_plan_noop"), severity="warning")
+            return
         for t in self.all_todos:
-            if t.planned_for == self.today and t.state == "attivo":
+            if t.planned_for == self.today and t.id == tid and t.state == "attivo":
                 t.paused = True
-                self.on_change()
-                self.refresh(recompose=True)
+                self._refresh_keep(tid)
                 return
-        self.notify(T("n_plan_susp_none"))
+        self.notify(T("n_plan_susp_none"), severity="warning")
 
     def action_close(self) -> None:
         self.dismiss()
