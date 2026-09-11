@@ -196,6 +196,71 @@ def test_form_ctrl_l_nessun_campo(tmp_files):
     asyncio.run(t())
 
 
+def _nl_example_of_day():
+    from datetime import date as _date
+
+    from src.lang import T as _T
+
+    examples = [_T("nl_exa1"), _T("nl_exa2"), _T("nl_exa3")]
+    return examples[_date.today().toordinal() % len(examples)]
+
+
+def test_inserisci_esempio(tmp_files):
+    """Click sul link a titolo vuoto: inserisce l'esempio, campi intatti."""
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            scr = app.screen
+            await pilot.click(scr.query_one("#nl-try", Label))
+            await pilot.pause()
+            assert scr.query_one("#title-input", Input).value == _nl_example_of_day()
+            assert scr.query_one("#due-input", Input).value == ""
+            preview = str(scr.query_one("#nl-preview", Label).render())
+            assert "→" in preview  # live preview ha parsato l'esempio
+
+    asyncio.run(t())
+
+
+def test_inserisci_esempio_titolo_pieno(tmp_files):
+    """A titolo pieno il link non distrugge niente."""
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            scr = app.screen
+            scr.query_one("#title-input", Input).value = "mio testo"
+            await pilot.click(scr.query_one("#nl-try", Label))
+            await pilot.pause()
+            assert scr.query_one("#title-input", Input).value == "mio testo"
+
+    asyncio.run(t())
+
+
+def test_placeholder_rotante(tmp_files):
+    async def t():
+        from src.lang import T as _T
+
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            ph = app.screen.query_one("#title-input", Input).placeholder
+            assert ph == _T("form_title_ph", ex=_nl_example_of_day())
+
+    asyncio.run(t())
+
+
 def _cli(args, home):
     env = dict(os.environ, TASKO_HOME=str(home))
     return subprocess.run(

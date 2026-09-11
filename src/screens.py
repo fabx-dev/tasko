@@ -94,6 +94,16 @@ class TodoFormScreen(ModalScreen[dict | None]):
         height: auto;
         margin-bottom: 1;
     }
+    #nl-syntax {
+        height: auto;
+        margin-bottom: 0;
+    }
+    #nl-try {
+        height: auto;
+        margin-bottom: 1;
+        text-style: underline;
+        color: $primary;
+    }
     #form-body Label {
         margin-bottom: 0;
     }
@@ -168,13 +178,24 @@ class TodoFormScreen(ModalScreen[dict | None]):
         self.screen_title = title or T("form_new")
         self.preset_project = (preset_project or "").strip().lower()
 
+    @staticmethod
+    def _nl_example() -> str:
+        """Esempio del giorno (rotazione deterministica, screenshot al sicuro)."""
+        examples = [T("nl_exa1"), T("nl_exa2"), T("nl_exa3")]
+        return examples[datetime.now().date().toordinal() % len(examples)]
+
     def compose(self) -> ComposeResult:
         with Vertical(id="form-container"):
             with Horizontal(id="form-title-wrap"):
                 yield Label(self.screen_title, id="form-title")
             with VerticalScroll(id="form-body", can_focus=False):
-                yield Input(placeholder=T("form_title_ph"), id="title-input")
+                yield Input(
+                    placeholder=T("form_title_ph", ex=self._nl_example()),
+                    id="title-input",
+                )
                 yield Label(f"[dim]{T('nl_hint')}[/]", id="nl-preview")
+                yield Label(f"[dim]{T('nl_syntax')}[/]", id="nl-syntax")
+                yield Label(T("nl_try"), id="nl-try")
                 yield Label(T("form_notes"))
                 yield TextArea("", id="notes-textarea")
                 with Horizontal(id="row-prog-due"):
@@ -311,6 +332,27 @@ class TodoFormScreen(ModalScreen[dict | None]):
         if not parts:
             return f"[dim]{T('nl_none')}[/]"
         return T("nl_preview", s=" · ".join(parts))
+
+    def on_click(self, event) -> None:
+        """Solo il link esempi; gli altri click scorrono liberi (niente stop)."""
+        try:
+            widget, _region = self.get_widget_at(event.screen_x, event.screen_y)
+        except Exception:
+            return
+        if widget is not None and getattr(widget, "id", None) == "nl-try":
+            self._insert_example()
+
+    def _insert_example(self) -> None:
+        """Scrive l'esempio nel titolo solo se vuoto (mai distruggere digitato)."""
+        try:
+            title_input = self.query_one("#title-input", Input)
+        except Exception:
+            return
+        if title_input.value.strip():
+            self.notify(T("nl_title_busy"), severity="warning")
+            return
+        title_input.value = self._nl_example()
+        title_input.focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel-btn":
