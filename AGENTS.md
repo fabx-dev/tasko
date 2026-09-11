@@ -44,7 +44,7 @@ src/commands.py  MENU_STRUCTURE (4 categorie: giornata/viste/dati/sistema, chiav
                  action + shortcut) + TaskoMenuProvider (palette `ctrl+p`, titoli
                  "Categoria › Voce"); MENU_IT piatta tenuta per compatibilita'
 src/lang.py      catalogo STRINGS it/en + key_sections (help) — vedi §4
-tests/           ~135 test; conftest.py con fixture di isolamento (vedi §5)
+tests/           ~142 test; conftest.py con fixture di isolamento (vedi §5)
 ```
 
 Flusso dati standard nelle action: muta oggetti → `store` → `_save_data()` (= `store.commit()`)
@@ -167,6 +167,10 @@ Regole dure:
   scattano prima); gruppi dropdown pre-costruiti e commutati via classi
   (remove+mount rapidi in sequenza danno `DuplicateIds`); focus via
   `call_after_refresh` con guardia su `_open_idx`.
+- **Health layout**: `HealthScreen` passata al pattern cornice fissa
+  (`#hea-box height 90%` + `#hea-list height 1fr`): a terminale piccolo la
+  lista sforava e il Chiudi usciva dalla cornice; regression test
+  `test_health_layout_terminale_piccolo` (120x40, 80x24, 70x20).
 - **Test Pilot**: `pilot.click` ravvicinati sullo stesso `Button` sono inghiottiti
   dal debounce visivo (`-active` 0.2s in `Button._on_click`) — nei test con
   toggle azzerare `active_effect_duration`; dopo i click usare attesa a
