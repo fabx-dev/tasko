@@ -59,8 +59,11 @@ def test_mattina(tmp_files):
             )
             box = app.screen.query_one("#brief-box").region
             btn = app.screen.query_one("#brief-close", Button).region
-            assert btn.width >= box.width - 8  # bottone a tutta larghezza
-            assert btn.y >= box.y and btn.y + btn.height <= box.y + box.height
+            prn = app.screen.query_one("#brief-print", Button).region
+            for r in (btn, prn):
+                assert r.x >= box.x and r.x + r.width <= box.x + box.width
+                assert r.y >= box.y and r.y + r.height <= box.y + box.height
+            assert prn.x + prn.width <= btn.x  # stampa a sinistra, chiudi a destra
 
     asyncio.run(t())
 
@@ -91,6 +94,39 @@ def test_sera(tmp_files):
             assert "P-piano" in txt  # rimasto in piano
             assert "#1" not in txt  # niente id interni
             assert T("brief_e_hint") in txt
+            from textual.widgets import Button
+
+            box = app.screen.query_one("#brief-box").region
+            btn = app.screen.query_one("#brief-close", Button).region
+            assert btn.y >= box.y and btn.y + btn.height <= box.y + box.height
+
+    asyncio.run(t())
+
+
+def test_stampa_mattina(tmp_files, monkeypatch, tmp_path):
+    """Tasto p / bottone Stampa: file Markdown senza markup, id isolati."""
+    from pathlib import Path as _P
+
+    monkeypatch.setenv("TASKO_HOME", str(tmp_path / "home"))
+
+    async def t():
+        app = make_app(_todos())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_briefing_morning()
+            await pilot.pause()
+            await pilot.pause()
+            await pilot.press("p")
+            await pilot.pause()
+            out = _P(str(tmp_path / "home")) / "Tasko_screenshots"
+            files = sorted(out.glob("tasko_briefing_morning_*.md"))
+            assert len(files) == 1
+            text = files[0].read_text(encoding="utf-8")
+            assert T("brief_m_title", date=_day(0)) in text
+            assert "O-ieri" in text
+            assert "[b]" not in text and "[dim]" not in text
+            # i titoli con [] utente resterebbero: nessun tag noto rimasto
+            assert "[green]" not in text
 
     asyncio.run(t())
 

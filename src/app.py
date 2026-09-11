@@ -1027,8 +1027,18 @@ class TodoApp(App):
             goal = int(self.config.get("daily_goal", 0) or 0)
         except (ValueError, TypeError):
             goal = 0
+
+        def on_print(m: str, day: str, text: str):
+            out_dir = _home() / "Tasko_screenshots"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            path = out_dir / f"tasko_briefing_{m}_{day.replace('-', '')}.md"
+            path.write_text(text, encoding="utf-8")
+            return path
+
         self.push_screen(
-            BriefingScreen(self.todos, mode=mode, hours=hours, daily_goal=goal)
+            BriefingScreen(
+                self.todos, mode=mode, hours=hours, daily_goal=goal, on_print=on_print
+            )
         )
 
     def action_briefing_morning(self) -> None:

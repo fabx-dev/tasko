@@ -1,6 +1,7 @@
 """Schermate modali (viste). Dipendono solo da models/storage/lang/nlparse."""
 
 import calendar
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -2552,7 +2553,29 @@ class BriefingScreen(ModalScreen[None]):
     }
     """
 
-    BINDINGS = [Binding("escape", "close", "Chiudi")]
+    BINDINGS = [
+        Binding("escape", "close", "Chiudi"),
+        Binding("p", "print_brief", "Stampa", show=False),
+    ]
+
+    # Tag di stile noti: gli unici rimossi nell'export (il resto, es. [x]
+    # nei titoli, e' contenuto utente e resta intatto).
+    _STYLE_TAGS = (
+        "b",
+        "/b",
+        "dim",
+        "/dim",
+        "green",
+        "red",
+        "cyan",
+        "yellow",
+        "bold",
+        "/bold",
+        "italic",
+        "/italic",
+        "underline",
+        "/underline",
+    )
 
     def __init__(
         self,
@@ -2561,6 +2584,7 @@ class BriefingScreen(ModalScreen[None]):
         today: str | None = None,
         hours: float = 6.0,
         daily_goal: int = 0,
+        on_print=None,
     ) -> None:
         super().__init__()
         self.all_todos = all_todos
@@ -2574,6 +2598,7 @@ class BriefingScreen(ModalScreen[None]):
             self.daily_goal = max(0, int(daily_goal or 0))
         except (ValueError, TypeError):
             self.daily_goal = 0
+        self.on_print = on_print
 
     def _by_date(self) -> dict[str, int]:
         result: dict[str, int] = {}
@@ -2722,6 +2747,7 @@ class BriefingScreen(ModalScreen[None]):
                     )
                     first = False
             with Horizontal(id="brief-buttons"):
+                yield Button(T("brief_print"), id="brief-print", variant="default")
                 yield Button(T("ui_close_esc"), id="brief-close", variant="default")
 
     def on_mount(self) -> None:
@@ -2733,9 +2759,36 @@ class BriefingScreen(ModalScreen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "brief-close":
             self.dismiss()
+        elif event.button.id == "brief-print":
+            self._print()
 
     def action_close(self) -> None:
         self.dismiss()
+
+    def action_print_brief(self) -> None:
+        self._print()
+
+    @classmethod
+    def _plain(cls, line: str) -> str:
+        tags = "|".join(re.escape(t) for t in cls._STYLE_TAGS)
+        return re.sub(rf"\[({tags})\]", "", line).strip()
+
+    def _print(self) -> None:
+        """Esporta il briefing in Markdown (via callback dell'app)."""
+        if self.on_print is None:
+            return
+        key = "brief_e_title" if self.mode == "evening" else "brief_m_title"
+        lines = (
+            self._evening_lines() if self.mode == "evening" else self._morning_lines()
+        )
+        text = "# " + T(key, date=self.today) + "\n\n"
+        text += "\n".join(self._plain(line) for line in lines) + "\n"
+        try:
+            path = self.on_print(self.mode, self.today, text)
+        except Exception as exc:
+            self.notify(T("n_exp_err", e=exc), severity="error")
+            return
+        self.notify(T("n_brief_printed", p=path))
 
 
 class GoalsScreen(ModalScreen[dict | None]):
