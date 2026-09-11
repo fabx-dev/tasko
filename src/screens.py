@@ -4063,7 +4063,8 @@ class HealthScreen(ModalScreen[None]):
     #hea-box {
         width: 64;
         max-width: 92%;
-        max-height: 88%;
+        height: 90%;
+        max-height: 90%;
     }
     #hea-title {
         text-align: center;
@@ -4079,8 +4080,7 @@ class HealthScreen(ModalScreen[None]):
         height: auto;
     }
     #hea-list {
-        height: auto;
-        max-height: 22;
+        height: 1fr;
         margin-bottom: 1;
     }
     """

@@ -134,3 +134,34 @@ def test_cli_giro_completo(tmp_path):
     real_path = _P("/home/fabri/.todo_app.json")
     if real_path.exists():
         assert "Chiamare Anna" not in real_path.read_text(encoding="utf-8")
+
+
+def test_health_layout_terminale_piccolo(tmp_files):
+    """La cornice contiene lista + Chiudi anche a terminale piccolo (niente overflow)."""
+
+    async def t():
+        todos = [
+            make_todo(f"T{i}", todo_id=i, project=f"p{i % 8}", due=_ds(5))
+            for i in range(1, 25)
+        ]
+        for size in ((120, 40), (80, 24), (70, 20)):
+            app = make_app(todos)
+            async with app.run_test(size=size) as pilot:
+                await pilot.pause()
+                app.action_view_health()
+                await pilot.pause()
+                await pilot.pause()
+                assert type(app.screen).__name__ == "HealthScreen"
+                box = app.screen.query_one("#hea-box").region
+                close = app.screen.query_one("#hea-close").region
+                lst = app.screen.query_one("#hea-list").region
+                for name, reg in (("close", close), ("list", lst)):
+                    assert reg.y >= box.y, (size, name, reg, box)
+                    assert reg.y + reg.height <= box.y + box.height, (
+                        size,
+                        name,
+                        reg,
+                        box,
+                    )
+
+    asyncio.run(t())
