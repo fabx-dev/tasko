@@ -154,14 +154,19 @@ Regole dure:
 - **AI-5**: `BriefingScreen` mattina/sera (solo composizione dati esistenti, zero rete) da
   palette; `tests/test_briefing.py`. Stop-criterion manuale: lettura reale 5 giorni.
 - **Menu**: `m` = `MenuScreen` a 2 colonne (voci a sx -> sottomenu a dx,
-  tutto allineato a sinistra; click/Enter apre, nuovo click = toggle;
-  frecce + Enter da tastiera, esc chiude),
+  tutto allineato a sinistra, righe compatte titolo+aiuto; click/Enter apre,
+  Enter entra sempre, nuovo click = toggle; frecce + 1-4 + type-to-filter,
+  esc a stadi filtro/sottomenu/menu),
   `ctrl+p` resta palette (`TaskoMenuProvider`, titoli "Categoria › Voce");
   menu completo anche delle azioni con tasto; `tests/test_menu.py`.
-  Lezioni: gruppi dropdown pre-costruiti e commutati via classi (remove+mount
-  rapidi in sequenza danno `DuplicateIds`); focus via
-  `call_after_refresh` con guardia su `_open_idx`; dopo `remove_children`+`mount`
-  il focus resta sul widget rimosso — `set_focus(None)` + `call_after_refresh`.
+  Lezioni: righe come `MenuRow` (Label focusable), non Button — il Click del
+  mouse (on_click sulla riga) e l'Enter (binding activate) restano
+  distinguibili (Button.Pressed li confonde) e niente debounce -active;
+  alle coordinate dell'evento in bolla non affidarsi (offset consumati);
+  il filtro cattura i caratteri in on_key + stop() (i binding globali
+  scattano prima); gruppi dropdown pre-costruiti e commutati via classi
+  (remove+mount rapidi in sequenza danno `DuplicateIds`); focus via
+  `call_after_refresh` con guardia su `_open_idx`.
 - **Test Pilot**: `pilot.click` ravvicinati sullo stesso `Button` sono inghiottiti
   dal debounce visivo (`-active` 0.2s in `Button._on_click`) — nei test con
   toggle azzerare `active_effect_duration`; dopo i click usare attesa a

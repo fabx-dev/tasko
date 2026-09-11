@@ -1,11 +1,11 @@
-"""Test menu per funzioni (m): categorie, navigazione a 2 livelli, palette."""
+"""Test menu per funzioni (m): voci a sinistra, sottomenu a destra, filtro."""
 
 import asyncio
 
 import src.commands as commands_module
 import src.lang as lang_module
 from src.lang import T
-from tests.conftest import make_app, make_todo
+from tests.conftest import make_app, make_todo, screen_texts
 
 
 def run(coro):
@@ -19,18 +19,6 @@ async def _wait_for(pilot, cond, tries: int = 40):
         if cond():
             return True
     return cond()
-
-
-def _no_debounce(screen):
-    """Azzera il debounce visivo dei Button (Textual ignora il Click se la
-    classe -active del press precedente non e' ancora scaduta: 0.2s)."""
-    from textual.widgets import Button
-
-    for b in screen.query(Button):
-        try:
-            b.active_effect_duration = 0
-        except Exception:
-            pass
 
 
 def test_struttura_quattro_categorie_e_action_esistenti(tmp_files):
@@ -82,27 +70,65 @@ def test_m_apre_menu_e_ctrl_p_resta_palette(tmp_files):
     assert type(make_app([make_todo("A")])).COMMAND_PALETTE_BINDING == "ctrl+p"
 
 
+def _row_text(w):
+    """Testo piano di una riga (version-proof: content su 8.x, renderable su 3.x)."""
+    for attr in ("content", "renderable"):
+        v = getattr(w, attr, None)
+        if v is not None:
+            return str(v)
+    return ""
+
+
+def _visible_texts(screen):
+    out = []
+    for w in screen.query("MenuRow"):
+        try:
+            if w.has_class("hidden"):
+                continue
+            parent_hidden = False
+            p = w.parent
+            while p is not None and p is not screen:
+                if hasattr(p, "has_class") and p.has_class("hidden"):
+                    parent_hidden = True
+                    break
+                p = getattr(p, "parent", None)
+            if parent_hidden:
+                continue
+        except Exception:
+            pass
+        out.append(_row_text(w))
+    return " ".join(out)
+
+
 def _bar_cats(screen):
     return {
-        b.id
-        for b in screen.query("#menu-bar Button")
-        if (b.id or "").startswith("menu-cat-")
+        w.id
+        for w in screen.query("#menu-bar MenuRow")
+        if (w.id or "").startswith("menu-cat-")
     }
 
 
-def _drop_items(screen):
-    if getattr(screen, "_open_idx", None) is None:
+def _visible_rows(screen, gi):
+    try:
+        return [
+            w
+            for w in screen.query(f"#menu-drop-{gi} MenuRow")
+            if not w.has_class("hidden")
+        ]
+    except Exception:
         return []
-    return [b.id for b in screen.query(f"#menu-drop-{screen._open_idx} Button")]
 
 
-def _drop_labels(screen):
-    if getattr(screen, "_open_idx", None) is None:
-        return ""
-    return " ".join(
-        b.label.plain if hasattr(b.label, "plain") else str(b.label)
-        for b in screen.query(f"#menu-drop-{screen._open_idx} Button")
-    )
+def _open_idx(screen):
+    return getattr(screen, "_open_idx", None)
+
+
+async def _open_menu(pilot, app):
+    await pilot.press("m")
+    await pilot.pause()
+    await pilot.pause()
+    assert type(app.screen).__name__ == "MenuScreen"
+    assert len(_bar_cats(app.screen)) == 4
 
 
 def test_navigazione_categorie_voci_e_chiusura(tmp_files):
@@ -110,37 +136,31 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
         app = make_app([make_todo("A")])
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            await pilot.press("m")
-            await pilot.pause()
-            await pilot.pause()
-            assert type(app.screen).__name__ == "MenuScreen"
-            _no_debounce(app.screen)
+            await _open_menu(pilot, app)
             # sinistra: solo le 4 voci; destra: segnaposto, nessun sottomenu
-            assert len(_bar_cats(app.screen)) == 4
-            assert _drop_items(app.screen) == []
-            from tests.conftest import screen_texts
-
+            assert _open_idx(app.screen) is None
             assert T("menu_pick") in screen_texts(app.screen)
             # click apre il sottomenu a destra
             await pilot.click("#menu-cat-0")
-            assert await _wait_for(pilot, lambda: len(_drop_items(app.screen)) >= 5)
-            assert T("menu_review_t") in _drop_labels(app.screen)
+            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
+            assert len(_visible_rows(app.screen, 0)) >= 5
+            assert T("menu_review_t") in screen_texts(app.screen)
+            # marcatore voce aperta + contatore
+            assert "›" in screen_texts(app.screen)
             # nuovo click sulla stessa voce lo chiude (toggle)
             await pilot.click("#menu-cat-0")
-            assert await _wait_for(pilot, lambda: _drop_items(app.screen) == [])
+            assert await _wait_for(pilot, lambda: _open_idx(app.screen) is None)
             assert len(_bar_cats(app.screen)) == 4
             # altra voce: sottomenu con le sue voci
             await pilot.click("#menu-cat-1")
-            assert await _wait_for(
-                pilot, lambda: T("menu_cal_t") in _drop_labels(app.screen)
-            )
+            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 1)
+            assert T("menu_cal_t") in screen_texts(app.screen)
             # esc chiude il sottomenu, resto nel menu
             await pilot.press("escape")
             await pilot.pause()
             await pilot.pause()
             assert type(app.screen).__name__ == "MenuScreen"
-            assert _drop_items(app.screen) == []
-            assert len(_bar_cats(app.screen)) == 4
+            assert _open_idx(app.screen) is None
             # esc chiude il menu
             await pilot.press("escape")
             await pilot.pause()
@@ -150,7 +170,7 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
     run(t())
 
 
-def test_scelta_voce_esegue_action(tmp_files):
+def test_scelta_voce_con_click(tmp_files):
     async def t():
         app = make_app([make_todo("A")])
         app.filter_search = "qualcosa"
@@ -159,18 +179,12 @@ def test_scelta_voce_esegue_action(tmp_files):
             app.action_open_menu()
             await pilot.pause()
             await pilot.pause()
-            assert type(app.screen).__name__ == "MenuScreen"
-            _no_debounce(app.screen)
             n_cat = len(commands_module.menu_categories())
             await pilot.click(f"#menu-cat-{n_cat - 1}")
-            assert await _wait_for(pilot, lambda: len(_drop_items(app.screen)) >= 5)
-            target = None
-            for b in app.screen.query(f"#menu-drop-{n_cat - 1} Button"):
-                label = b.label.plain if hasattr(b.label, "plain") else str(b.label)
-                if T("menu_clearf_t") in label:
-                    target = "#" + (b.id or "")
-                    break
-            assert target, "voce Pulisci filtri non trovata"
+            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == n_cat - 1)
+            assert len(_visible_rows(app.screen, n_cat - 1)) >= 5
+            target = f"#menu-item-{n_cat - 1}-2"
+            assert T("menu_clearf_t") in screen_texts(app.screen)
             await pilot.click(target)
             assert await _wait_for(
                 pilot, lambda: type(app.screen).__name__ != "MenuScreen"
@@ -186,20 +200,18 @@ def test_frecce_ed_enter_da_tastiera(tmp_files):
         app.filter_search = "qualcosa"
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            await pilot.press("m")
-            await pilot.pause()
-            await pilot.pause()
+            await _open_menu(pilot, app)
             assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
-            assert _drop_items(app.screen) == []
             # giu/su scorrono le voci con anteprima del sottomenu a destra
             await pilot.press("down")
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-cat-1"
-            assert T("menu_cal_t") in _drop_labels(app.screen)
+            assert _open_idx(app.screen) == 1
+            assert len(_visible_rows(app.screen, 1)) >= 5
             await pilot.press("up")
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
-            assert T("menu_review_t") in _drop_labels(app.screen)
+            assert _open_idx(app.screen) == 0
             # destra entra nel sottomenu, su torna alla voce
             await pilot.press("right")
             await pilot.pause()
@@ -208,23 +220,40 @@ def test_frecce_ed_enter_da_tastiera(tmp_files):
             await pilot.press("down")
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-item-0-1"
-            await pilot.press("up")
-            await pilot.pause()
-            assert getattr(app.screen.focused, "id", None) == "menu-item-0-0"
-            await pilot.press("up")
-            await pilot.pause()
-            assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
-            # sinistra sulla voce non fa nulla, poi giu fino a Sistema
             await pilot.press("left")
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
+            # Enter sulla voce ENTRA (non chiude): resta nel menu
+            await pilot.press("down")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "MenuScreen"
+            assert _open_idx(app.screen) == 1
+            assert getattr(app.screen.focused, "id", None) == "menu-item-1-0"
+            # Enter sulla riga esegue (Calendario, prima voce di Viste)
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "CalendarScreen"
+
+    run(t())
+
+
+def test_enter_su_riga_esegue_action(tmp_files):
+    async def t():
+        app = make_app([make_todo("A")])
+        app.filter_search = "qualcosa"
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await _open_menu(pilot, app)
+            # giu fino a Sistema, destra, giu x2 = Pulisci filtri, enter
             await pilot.press("down")
             await pilot.press("down")
             await pilot.press("down")
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-cat-3"
-            assert T("menu_settings_t") in _drop_labels(app.screen)
-            # destra + giu + enter sulla terza voce = Pulisci filtri
             await pilot.press("right")
             await pilot.pause()
             await pilot.pause()
@@ -243,6 +272,111 @@ def test_frecce_ed_enter_da_tastiera(tmp_files):
     run(t())
 
 
+def test_tasti_1_4_saltano_alle_categorie(tmp_files):
+    async def t():
+        app = make_app([make_todo("A")])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await _open_menu(pilot, app)
+            await pilot.press("3")
+            await pilot.pause()
+            await pilot.pause()
+            assert _open_idx(app.screen) == 2
+            assert T("menu_backup_now_t") in screen_texts(app.screen)
+            await pilot.press("1")
+            await pilot.pause()
+            await pilot.pause()
+            assert _open_idx(app.screen) == 0
+
+    run(t())
+
+
+def test_righe_compatte_su_due_righe(tmp_files):
+    async def t():
+        app = make_app([make_todo("A")])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await _open_menu(pilot, app)
+            await pilot.click("#menu-cat-0")
+            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
+            row = app.screen.query_one("#menu-item-0-0")
+            assert row.region.height == 2, row.region
+            txt = screen_texts(app.screen)
+            assert T("menu_review_t") in txt
+            # aiuto sulla seconda riga, in grigio: presente nel testo
+            assert T("menu_review_h") in txt
+
+    run(t())
+
+
+def test_filtro_digitazione(tmp_files):
+    async def _type(pilot, word):
+        for ch in word:
+            await pilot.press(ch)
+            await pilot.pause()
+
+    async def t():
+        app = make_app([make_todo("A")])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await _open_menu(pilot, app)
+            kanban_before = app.config.get("kanban_visible", True)
+            await _type(pilot, "backup")
+            assert await _wait_for(
+                pilot, lambda: T("menu_no_match") not in screen_texts(app.screen)
+            )
+            txt = _visible_texts(app.screen)
+            # conteggio filtro visibile, solo Dati mostra risultati
+            assert "backup" in screen_texts(app.screen).lower()
+            assert T("menu_backup_now_t") in txt
+            assert T("menu_cal_t") not in txt
+            # i tasti digitati non hanno attivato i binding globali (b/c/k/p)
+            assert type(app.screen).__name__ == "MenuScreen"
+            assert app.config.get("kanban_visible", True) == kanban_before
+            # giu va al primo risultato, enter lo esegue (backup: nessun modale)
+            await pilot.press("down")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "menu-item-2-0"
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ != "MenuScreen"
+
+    run(t())
+
+
+def test_filtro_backspace_esc_e_nessun_risultato(tmp_files):
+    async def t():
+        app = make_app([make_todo("A")])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await _open_menu(pilot, app)
+            for ch in "zzz":
+                await pilot.press(ch)
+                await pilot.pause()
+            assert await _wait_for(
+                pilot, lambda: T("menu_no_match", q="zzz") in screen_texts(app.screen)
+            )
+            # backspace svuota un carattere alla volta
+            await pilot.press("backspace")
+            await pilot.pause()
+            assert app.screen._filter == "zz"
+            # esc svuota il filtro ma resta nel menu
+            await pilot.press("escape")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "MenuScreen"
+            assert app.screen._filter == ""
+            assert T("menu_pick") in screen_texts(app.screen)
+            # esc chiude il menu
+            await pilot.press("escape")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ != "MenuScreen"
+
+    run(t())
+
+
 def test_nuove_chiavi_parita_it_en(tmp_files):
     for key in (
         "menu_cat_day_t",
@@ -252,6 +386,8 @@ def test_nuove_chiavi_parita_it_en(tmp_files):
         "menu_title",
         "menu_hint",
         "menu_pick",
+        "menu_filter",
+        "menu_no_match",
         "menu_dayplan_t",
         "menu_cal_t",
         "menu_week_t",
