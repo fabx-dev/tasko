@@ -12,6 +12,27 @@ def run(coro):
     return asyncio.run(coro)
 
 
+async def _wait_for(pilot, cond, tries: int = 40):
+    """Attende una condizione (runner CI lenti: pause fisse non bastano)."""
+    for _ in range(tries):
+        await pilot.pause()
+        if cond():
+            return True
+    return cond()
+
+
+def _no_debounce(screen):
+    """Azzera il debounce visivo dei Button (Textual ignora il Click se la
+    classe -active del press precedente non e' ancora scaduta: 0.2s)."""
+    from textual.widgets import Button
+
+    for b in screen.query(Button):
+        try:
+            b.active_effect_duration = 0
+        except Exception:
+            pass
+
+
 def test_struttura_quattro_categorie_e_action_esistenti(tmp_files):
     cats = commands_module.menu_categories()
     assert len(cats) == 4
@@ -98,26 +119,23 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
             await pilot.pause()
             await pilot.pause()
             assert type(app.screen).__name__ == "MenuScreen"
+            _no_debounce(app.screen)
             # ramo principale: solo le 4 categorie, nessun dropdown aperto
             assert len(_bar_cats(app.screen)) == 4
             assert _drop_items(app.screen) == []
             # click apre il dropdown sotto la voce
             await pilot.click("#menu-cat-0")
-            await pilot.pause()
-            await pilot.pause()
-            assert len(_drop_items(app.screen)) >= 5
+            assert await _wait_for(pilot, lambda: len(_drop_items(app.screen)) >= 5)
             assert T("menu_review_t") in _drop_labels(app.screen)
             # nuovo click sulla stessa voce lo chiude (toggle)
             await pilot.click("#menu-cat-0")
-            await pilot.pause()
-            await pilot.pause()
-            assert _drop_items(app.screen) == []
+            assert await _wait_for(pilot, lambda: _drop_items(app.screen) == [])
             assert len(_bar_cats(app.screen)) == 4
             # altra voce: dropdown con le sue voci
             await pilot.click("#menu-cat-1")
-            await pilot.pause()
-            await pilot.pause()
-            assert T("menu_cal_t") in _drop_labels(app.screen)
+            assert await _wait_for(
+                pilot, lambda: T("menu_cal_t") in _drop_labels(app.screen)
+            )
             # esc chiude il dropdown, resto nel menu
             await pilot.press("escape")
             await pilot.pause()
@@ -144,21 +162,21 @@ def test_scelta_voce_esegue_action(tmp_files):
             await pilot.pause()
             await pilot.pause()
             assert type(app.screen).__name__ == "MenuScreen"
+            _no_debounce(app.screen)
             n_cat = len(commands_module.menu_categories())
             await pilot.click(f"#menu-cat-{n_cat - 1}")
-            await pilot.pause()
-            await pilot.pause()
+            assert await _wait_for(pilot, lambda: len(_drop_items(app.screen)) >= 5)
             target = None
-            for b in app.screen.query("#menu-drop Button"):
+            for b in app.screen.query(f"#menu-drop-{n_cat - 1} Button"):
                 label = b.label.plain if hasattr(b.label, "plain") else str(b.label)
                 if T("menu_clearf_t") in label:
                     target = "#" + (b.id or "")
                     break
             assert target, "voce Pulisci filtri non trovata"
             await pilot.click(target)
-            await pilot.pause()
-            await pilot.pause()
-            assert type(app.screen).__name__ != "MenuScreen"
+            assert await _wait_for(
+                pilot, lambda: type(app.screen).__name__ != "MenuScreen"
+            )
             assert app.filter_search == "" and app.filter_tag is None
 
     run(t())

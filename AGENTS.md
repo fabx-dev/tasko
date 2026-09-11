@@ -163,6 +163,10 @@ Regole dure:
   `call_after_refresh` con guardia su `_open_idx` (le region a riga nascosta
   sono zero); dopo `remove_children`+`mount` il focus resta sul widget
   rimosso — `set_focus(None)` + `call_after_refresh`.
+- **Test Pilot**: `pilot.click` ravvicinati sullo stesso `Button` sono inghiottiti
+  dal debounce visivo (`-active` 0.2s in `Button._on_click`) — nei test con
+  toggle azzerare `active_effect_duration`; dopo i click usare attesa a
+  condizione (`_wait_for`) invece di pause fisse (runner CI lenti).
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 

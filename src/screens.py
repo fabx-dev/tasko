@@ -4276,8 +4276,10 @@ class MenuScreen(ModalScreen[str | None]):
         with Vertical(id="menu-box"):
             yield Label(T("menu_title"), id="menu-title")
             with Horizontal(id="menu-bar"):
-                for i, (ct, ch, _items) in enumerate(self.categories):
-                    yield Button(ct, id=f"menu-cat-{i}", variant="default", tooltip=ch)
+                # Niente tooltip sulle voci: l'overlay del tooltip intercetta
+                # i click sintetici del Pilot (mouse fermo) e il toggle diventa flaky.
+                for i, (ct, _ch, _items) in enumerate(self.categories):
+                    yield Button(ct, id=f"menu-cat-{i}", variant="default")
             with Horizontal(id="menu-drop-row", classes="hidden"):
                 yield Static("", id="menu-drop-spacer")
                 with VerticalScroll(id="menu-drop", can_focus=False):
