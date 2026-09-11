@@ -44,6 +44,7 @@ from src.screens import (
     KeysScreen,
     LockScreen,
     PasswordScreen,
+    PlanProposalScreen,
     PomodoroScreen,
     RestoreScreen,
     ReviewScreen,
@@ -309,6 +310,7 @@ class TodoApp(App):
         Binding("b", "toggle_kanban", "Kanban", show=False),
         Binding("B", "view_kanban", "Kanban full", show=False),
         Binding("p", "view_daily_plan", "Piano", show=False),
+        Binding("P", "plan_day", "Pianifica", show=False),
         Binding("k", "view_stats", "Statistiche", show=False),
         Binding("o", "start_pomodoro", "Pomodoro", show=False),
         Binding("O", "pomodoro_pause", "Pausa/Riprendi", show=False),
@@ -1003,6 +1005,17 @@ class TodoApp(App):
         except (ValueError, TypeError):
             goal = 0
         self.push_screen(ReviewScreen(self.todos, on_change, daily_goal=goal))
+
+    def action_plan_day(self) -> None:
+        def on_change() -> None:
+            self._save_data()
+            self._populate_table()
+
+        try:
+            hours = float(self.config.get("day_hours", 6) or 6)
+        except (ValueError, TypeError):
+            hours = 6.0
+        self.push_screen(PlanProposalScreen(self.todos, on_change, hours=hours))
 
     def action_view_stats(self) -> None:
         self.push_screen(
@@ -2107,6 +2120,7 @@ class TodoApp(App):
             self.config["weekly_goal"] = result["weekly_goal"]
             self.config["pomo_daily_goal"] = result["pomo_daily_goal"]
             self.config["reminder_min"] = result["reminder_min"]
+            self.config["day_hours"] = result["day_hours"]
             self.config["sounds"] = result["sounds"]
             old_lang = self.config.get("lang", "auto")
             self.config["lang"] = result.get("lang", old_lang)

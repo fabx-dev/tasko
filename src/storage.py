@@ -367,6 +367,7 @@ DEFAULT_CONFIG: dict = {
     "onboarded": False,
     "reminder_min": 10,
     "sounds": True,
+    "day_hours": 6,
 }
 
 
@@ -413,6 +414,11 @@ def load_config() -> dict:
     except (ValueError, TypeError):
         cfg["reminder_min"] = 10
     cfg["sounds"] = bool(data.get("sounds", True))
+    try:
+        hours = int(data.get("day_hours", 6))
+        cfg["day_hours"] = hours if 1 <= hours <= 16 else 6
+    except (ValueError, TypeError):
+        cfg["day_hours"] = 6
     return cfg
 
 
@@ -429,6 +435,7 @@ def save_config(cfg: dict) -> None:
         "onboarded": bool(cfg.get("onboarded", False)),
         "reminder_min": _clamp_int(cfg.get("reminder_min", 10), 10, 0, 120),
         "sounds": bool(cfg.get("sounds", True)),
+        "day_hours": _clamp_int(cfg.get("day_hours", 6), 6, 1, 16),
         "lang": str(cfg.get("lang", "auto")).lower()
         if str(cfg.get("lang", "auto")).lower() in ("auto", "it", "en")
         else "auto",

@@ -46,6 +46,7 @@ from src.models import (
     _status,
 )
 from src.nlparse import parse
+from src.plan import plan_day
 from src.storage import _backup_sources, snapshot_info
 
 
@@ -2180,6 +2181,150 @@ class ReviewScreen(ModalScreen[None]):
         self.dismiss()
 
 
+class PlanProposalScreen(ModalScreen[None]):
+    """Piano smart: proposta ordinata da plan_day, conferma scrive planned_for=oggi."""
+
+    CSS = """
+    #planp-box {
+        width: 100;
+        max-width: 95%;
+        height: 90%;
+    }
+    #planp-list {
+        height: 1fr;
+        margin-bottom: 1;
+    }
+    #planp-summary {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #planp-legend {
+        height: auto;
+        margin-top: 1;
+    }
+    #planp-buttons {
+        width: 100%;
+        height: 3;
+        margin-top: 1;
+    }
+    #planp-buttons Button {
+        width: 1fr;
+        min-width: 14;
+        height: 3;
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        Binding("escape", "close", "Chiudi"),
+        Binding("ctrl+enter", "confirm", "Conferma", show=False),
+    ]
+
+    def __init__(
+        self,
+        all_todos: list[TodoItem],
+        on_change,
+        today: str | None = None,
+        hours: float = 6.0,
+    ) -> None:
+        super().__init__()
+        self.all_todos = all_todos
+        self.on_change = on_change
+        self.today = today or datetime.now().strftime("%Y-%m-%d")
+        try:
+            self.hours = max(1.0, float(hours))
+        except (ValueError, TypeError):
+            self.hours = 6.0
+        self.plan = plan_day(self.all_todos, today=self.today, hours=self.hours)
+        self.by_id = {t.id: t for t in self.all_todos if t.id is not None}
+
+    @staticmethod
+    def _is_cut(reasons) -> bool:
+        return any(k == "plan_cut" for k, _p in reasons)
+
+    def _option_label(self, t_id: int, reasons) -> str:
+        t = self.by_id.get(t_id)
+        title = t.title if t else f"#{t_id}"
+        due = _due_date_part(t.due) if t else ""
+        extra = f" (scad. {due})" if due else ""
+        why = ", ".join(T(k, **p) for k, p in reasons if k != "plan_cut")
+        # Niente []: le option del SelectionList interpretano il markup Rich.
+        cut = f" ({T('plan_cut')})" if self._is_cut(reasons) else ""
+        return f"{title}{extra}  #{t_id} ({why}){cut}"
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="planp-box"):
+            yield Label(
+                f"[b]{T('planp_title', date=_format_date_it(self.today))}[/b]",
+                id="planp-title",
+            )
+            n_in = sum(1 for _i, _s, r in self.plan if not self._is_cut(r))
+            yield Static(
+                T("planp_summary", n=n_in, c=len(self.plan) - n_in, h=int(self.hours)),
+                id="planp-summary",
+            )
+            if self.plan:
+                yield SelectionList(
+                    *[
+                        (
+                            self._option_label(t_id, reasons),
+                            t_id,
+                            not self._is_cut(reasons),
+                        )
+                        for t_id, _score, reasons in self.plan
+                    ],
+                    id="planp-list",
+                )
+            else:
+                yield Static(T("planp_empty"))
+            yield Static(T("rev_legend"), id="planp-legend")
+            with Horizontal(id="planp-buttons"):
+                yield Button(T("form_save"), id="planp-confirm", variant="default")
+                yield Button(T("form_cancel"), id="planp-close", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#planp-list", SelectionList).focus()
+        except Exception:
+            try:
+                self.query_one("#planp-confirm", Button).focus()
+            except Exception:
+                self.focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "planp-close":
+            self.dismiss()
+        elif event.button.id == "planp-confirm":
+            self._confirm()
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+    def action_confirm(self) -> None:
+        self._confirm()
+
+    def _selected_ids(self) -> set:
+        try:
+            return set(self.query_one("#planp-list", SelectionList).selected)
+        except Exception:
+            return set()
+
+    def _confirm(self) -> None:
+        selected = self._selected_ids()
+        n = 0
+        for t in self.all_todos:
+            if t.state != "attivo":
+                continue
+            if t.id in selected:
+                t.planned_for = self.today
+                n += 1
+            elif t.planned_for == self.today:
+                t.planned_for = ""
+        self.on_change()
+        self.notify(T("n_planp_saved", n=n))
+        self.dismiss()
+
+
 class GoalsScreen(ModalScreen[dict | None]):
     """Imposta obiettivi giornaliero/settimanale (0 = disattivato)."""
 
@@ -2885,6 +3030,8 @@ class SettingsScreen(ModalScreen[dict | None]):
                 yield Input(
                     str(self.current.get("pomo_daily_goal", 8)), id="set-pomo-goal"
                 )
+                yield Label(T("set_hours"))
+                yield Input(str(self.current.get("day_hours", 6)), id="set-hours")
                 yield Label(T("set_focus"))
                 yield Input(str(self.current.get("focus_min", 25)), id="set-focus")
                 yield Label(T("set_short"))
@@ -2946,13 +3093,14 @@ class SettingsScreen(ModalScreen[dict | None]):
         daily = self._num("set-daily", 0, 100)
         weekly = self._num("set-weekly", 0, 500)
         pomo = self._num("set-pomo-goal", 0, 100)
+        hours = self._num("set-hours", 1, 16)
         focus = self._num("set-focus", 1, 180)
         short = self._num("set-short", 1, 60)
         longm = self._num("set-long", 1, 60)
         every = self._num("set-every", 2, 12)
         reminder = self._num("set-reminder", 0, 120)
         sounds = self.query_one("#set-sounds", Select).value
-        if None in (daily, weekly, pomo, focus, short, longm, every, reminder):
+        if None in (daily, weekly, pomo, focus, short, longm, every, reminder, hours):
             return
         self.dismiss(
             {
@@ -2962,6 +3110,7 @@ class SettingsScreen(ModalScreen[dict | None]):
                 "daily_goal": daily,
                 "weekly_goal": weekly,
                 "pomo_daily_goal": pomo,
+                "day_hours": hours,
                 "focus_min": focus,
                 "short_min": short,
                 "long_min": longm,
