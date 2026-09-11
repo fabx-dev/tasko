@@ -48,6 +48,19 @@ def test_mattina(tmp_files):
             assert T("plan_overdue") in txt  # motivo su riga propria
             assert "()" not in txt  # niente parentesi vuote
             assert T("stats_serie", n=1) in txt
+            from textual.widgets import Button, Static
+
+            statics = [
+                str(getattr(w, "content", "") or "") for w in app.screen.query(Static)
+            ]
+            streak = [s for s in statics if "Serie" in s or "Streak" in s]
+            assert streak and all(
+                s.startswith("  ") and not s.startswith("   ") for s in streak
+            )
+            box = app.screen.query_one("#brief-box").region
+            btn = app.screen.query_one("#brief-close", Button).region
+            assert btn.width >= box.width - 8  # bottone a tutta larghezza
+            assert btn.y >= box.y and btn.y + btn.height <= box.y + box.height
 
     asyncio.run(t())
 

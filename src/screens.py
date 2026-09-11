@@ -2526,6 +2526,15 @@ class BriefingScreen(ModalScreen[None]):
     #brief-scroll {
         height: 1fr;
     }
+    #brief-buttons {
+        width: 100%;
+        height: 3;
+        margin-top: 1;
+    }
+    #brief-buttons Button {
+        width: 1fr;
+        height: 3;
+    }
     #brief-title {
         text-align: center;
         text-style: bold;
@@ -2641,9 +2650,12 @@ class BriefingScreen(ModalScreen[None]):
             "  " + T("brief_m_yest", d=len(self._done_on(yest)), p=self._pomo_on(yest)),
         ]
         streak = self._streak(self._by_date())
-        lines.append(
-            "  " + (T("stats_serie", n=streak) if streak else T("stats_serie_off"))
-        )
+        # Le chiavi stats_serie* hanno uno spazio iniziale incorporato (serve
+        # alla stats): qui lo togliamo per allinearci alle altre righe.
+        streak_txt = (
+            T("stats_serie", n=streak) if streak else T("stats_serie_off")
+        ).lstrip()
+        lines.append("  " + streak_txt)
         top = [
             (t_id, reasons)
             for t_id, _s, reasons in plan_day(
@@ -2676,9 +2688,10 @@ class BriefingScreen(ModalScreen[None]):
             count = f"{len(done)} · {pomo} 🍅"
         lines = [T("brief_e_sec_done"), f"  {count}"]
         streak = self._streak(self._by_date())
-        lines.append(
-            "  " + (T("stats_serie", n=streak) if streak else T("stats_serie_off"))
-        )
+        streak_txt = (
+            T("stats_serie", n=streak) if streak else T("stats_serie_off")
+        ).lstrip()
+        lines.append("  " + streak_txt)
         lines.append(T("brief_e_sec_left"))
         if left:
             for t in left:
@@ -2708,7 +2721,8 @@ class BriefingScreen(ModalScreen[None]):
                         classes="brief-line" if first else "brief-head",
                     )
                     first = False
-            yield Button(T("ui_close_esc"), id="brief-close", variant="default")
+            with Horizontal(id="brief-buttons"):
+                yield Button(T("ui_close_esc"), id="brief-close", variant="default")
 
     def on_mount(self) -> None:
         try:
