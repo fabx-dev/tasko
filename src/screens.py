@@ -4250,7 +4250,7 @@ class MenuScreen(ModalScreen[str | None]):
         margin-bottom: 1;
     }
     #menu-bar {
-        width: 20;
+        width: 24;
         height: 100%;
         margin-right: 2;
     }
