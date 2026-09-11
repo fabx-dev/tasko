@@ -2325,6 +2325,205 @@ class PlanProposalScreen(ModalScreen[None]):
         self.dismiss()
 
 
+class BriefingScreen(ModalScreen[None]):
+    """Briefing mattina / resoconto sera: solo composizione di dati esistenti."""
+
+    CSS = """
+    #brief-box {
+        width: 80;
+        max-width: 95%;
+        height: 90%;
+    }
+    #brief-scroll {
+        height: 1fr;
+    }
+    #brief-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+    .brief-line {
+        height: auto;
+        margin-bottom: 0;
+    }
+    .brief-head {
+        height: auto;
+        margin-top: 1;
+        margin-bottom: 0;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "close", "Chiudi")]
+
+    def __init__(
+        self,
+        all_todos: list[TodoItem],
+        mode: str = "morning",
+        today: str | None = None,
+        hours: float = 6.0,
+        daily_goal: int = 0,
+    ) -> None:
+        super().__init__()
+        self.all_todos = all_todos
+        self.mode = "evening" if mode == "evening" else "morning"
+        self.today = today or datetime.now().strftime("%Y-%m-%d")
+        try:
+            self.hours = max(1.0, float(hours))
+        except (ValueError, TypeError):
+            self.hours = 6.0
+        try:
+            self.daily_goal = max(0, int(daily_goal or 0))
+        except (ValueError, TypeError):
+            self.daily_goal = 0
+
+    def _by_date(self) -> dict[str, int]:
+        result: dict[str, int] = {}
+        for t in self.all_todos:
+            if t.completed_at:
+                day = t.completed_at[:10]
+                result[day] = result.get(day, 0) + 1
+        return result
+
+    def _streak(self, by_date: dict[str, int]) -> int:
+        # Mirror di StatsScreen._streak (stessa regola: vale da ieri se oggi e' a zero).
+        try:
+            today_d = datetime.strptime(self.today, "%Y-%m-%d").date()
+        except ValueError:
+            return 0
+        d = (
+            today_d
+            if by_date.get(today_d.strftime("%Y-%m-%d"), 0) > 0
+            else today_d - timedelta(days=1)
+        )
+        streak = 0
+        while by_date.get(d.strftime("%Y-%m-%d"), 0) > 0:
+            streak += 1
+            d -= timedelta(days=1)
+        return streak
+
+    def _done_on(self, day: str) -> list[TodoItem]:
+        return [
+            t for t in self.all_todos if t.done and (t.completed_at or "")[:10] == day
+        ]
+
+    def _pomo_on(self, day: str) -> int:
+        return sum(
+            1 for t in self.all_todos for ts in (t.pomodoro_log or []) if ts[:10] == day
+        )
+
+    def _active(self) -> list[TodoItem]:
+        return [t for t in self.all_todos if t.state == "attivo"]
+
+    def _yesterday(self) -> str:
+        try:
+            return (
+                datetime.strptime(self.today, "%Y-%m-%d") - timedelta(days=1)
+            ).strftime("%Y-%m-%d")
+        except ValueError:
+            return self.today
+
+    def _morning_lines(self) -> list[str]:
+        active = self._active()
+        if not active:
+            return [T("brief_m_empty")]
+        planned = [t for t in active if t.planned_for == self.today]
+        due = [t for t in active if _due_date_part(t.due) == self.today]
+        overdue = [
+            t
+            for t in active
+            if _due_date_part(t.due) and _due_date_part(t.due) < self.today
+        ]
+        load = sum(int(t.stima_pomo or 0) for t in planned)
+        cap = int(self.hours / 0.5)
+        yest = self._yesterday()
+        lines = [
+            T(
+                "brief_m_today",
+                p=len(planned),
+                d=len(due),
+                o=len(overdue),
+            ),
+            T("brief_m_load", s=load, c=cap, h=int(self.hours)),
+            T("brief_m_yest", d=len(self._done_on(yest)), p=self._pomo_on(yest)),
+        ]
+        streak = self._streak(self._by_date())
+        lines.append(T("stats_serie", n=streak) if streak else T("stats_serie_off"))
+        top = [
+            (t_id, reasons)
+            for t_id, _s, reasons in plan_day(
+                active, today=self.today, hours=self.hours
+            )
+            if not any(k == "plan_cut" for k, _p in reasons)
+        ][:5]
+        if top:
+            lines.append(T("brief_m_top"))
+            by_id = {t.id: t for t in active}
+            for t_id, reasons in top:
+                t = by_id.get(t_id)
+                title = t.title if t else f"#{t_id}"
+                why = ", ".join(T(k, **p) for k, p in reasons)
+                lines.append(f"  • {title}  [dim]({why})[/]")
+        lines.append(T("brief_m_hint"))
+        return lines
+
+    def _evening_lines(self) -> list[str]:
+        done = self._done_on(self.today)
+        left = [t for t in self._active() if t.planned_for == self.today]
+        lines = [
+            T(
+                "brief_e_done",
+                d=len(done),
+                g=self.daily_goal,
+                p=self._pomo_on(self.today),
+            )
+        ]
+        streak = self._streak(self._by_date())
+        lines.append(T("stats_serie", n=streak) if streak else T("stats_serie_off"))
+        if left:
+            lines.append(T("brief_e_left_t"))
+            lines.extend(f"  • {t.title}  [dim]#{t.id}[/]" for t in left)
+        else:
+            lines.append(T("brief_e_left_empty"))
+        lines.append(T("brief_e_hint"))
+        return lines
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="brief-box"):
+            key = "brief_e_title" if self.mode == "evening" else "brief_m_title"
+            yield Label(
+                f"[b]{T(key, date=_format_date_it(self.today))}[/b]",
+                id="brief-title",
+            )
+            with VerticalScroll(id="brief-scroll"):
+                lines = (
+                    self._evening_lines()
+                    if self.mode == "evening"
+                    else self._morning_lines()
+                )
+                first = True
+                for line in lines:
+                    yield Static(
+                        line,
+                        classes="brief-line" if first else "brief-head",
+                    )
+                    first = False
+            yield Button(T("ui_close_esc"), id="brief-close", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#brief-close", Button).focus()
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "brief-close":
+            self.dismiss()
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+
 class GoalsScreen(ModalScreen[dict | None]):
     """Imposta obiettivi giornaliero/settimanale (0 = disattivato)."""
 

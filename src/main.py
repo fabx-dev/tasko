@@ -49,6 +49,7 @@ from src.models import (
 )
 from src.screens import (
     ArchiveScreen,
+    BriefingScreen,
     CalendarScreen,
     ConfirmScreen,
     DailyPlanScreen,
@@ -113,6 +114,7 @@ __all__ = [
     "_demo_todos",
     "TaskoMenuProvider",
     "ArchiveScreen",
+    "BriefingScreen",
     "CalendarScreen",
     "ConfirmScreen",
     "DailyPlanScreen",

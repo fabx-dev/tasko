@@ -29,6 +29,8 @@ class TaskoMenuProvider(Provider):
         (T("menu_archive_view_t"), T("menu_archive_view_h"), "action_view_archive"),
         (T("menu_review_t"), T("menu_review_h"), "action_open_review"),
         (T("menu_plan_t"), T("menu_plan_h"), "action_plan_day"),
+        (T("menu_brief_t"), T("menu_brief_h"), "action_briefing_morning"),
+        (T("menu_retro_t"), T("menu_retro_h"), "action_briefing_evening"),
     )
 
     def _iter(self):

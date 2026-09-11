@@ -32,6 +32,7 @@ from src.models import (
 )
 from src.screens import (
     ArchiveScreen,
+    BriefingScreen,
     CalendarScreen,
     ConfirmScreen,
     DailyPlanScreen,
@@ -1016,6 +1017,25 @@ class TodoApp(App):
         except (ValueError, TypeError):
             hours = 6.0
         self.push_screen(PlanProposalScreen(self.todos, on_change, hours=hours))
+
+    def _briefing(self, mode: str) -> None:
+        try:
+            hours = float(self.config.get("day_hours", 6) or 6)
+        except (ValueError, TypeError):
+            hours = 6.0
+        try:
+            goal = int(self.config.get("daily_goal", 0) or 0)
+        except (ValueError, TypeError):
+            goal = 0
+        self.push_screen(
+            BriefingScreen(self.todos, mode=mode, hours=hours, daily_goal=goal)
+        )
+
+    def action_briefing_morning(self) -> None:
+        self._briefing("morning")
+
+    def action_briefing_evening(self) -> None:
+        self._briefing("evening")
 
     def action_view_stats(self) -> None:
         self.push_screen(
