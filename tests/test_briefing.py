@@ -50,9 +50,13 @@ def test_mattina(tmp_files):
             assert T("stats_serie", n=1) in txt
             from textual.widgets import Button, Static
 
-            statics = [
-                str(getattr(w, "content", "") or "") for w in app.screen.query(Static)
-            ]
+            def _text(w):
+                content = getattr(w, "content", None)
+                if content is None:
+                    content = getattr(w, "renderable", "")
+                return str(content)
+
+            statics = [_text(w) for w in app.screen.query(Static)]
             streak = [s for s in statics if "Serie" in s or "Streak" in s]
             assert streak and all(
                 s.startswith("  ") and not s.startswith("   ") for s in streak

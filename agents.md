@@ -104,6 +104,8 @@ Regole dure:
   `select/deselect/toggle(value)`, prop `selected`.
 - Testo screen nei test: helper `screen_texts()` di conftest (gestisce `.content`/`.renderable`);
   attese via `T(chiave)` non stringhe hardcodate (la lingua effettiva dipende dall'env).
+  Mai `.content` diretto: non esiste in tutte le versioni di Textual (la CI installa
+  la più recente <4, diversa dalla venv) — ha rotto la CI una volta.
 - Script ad-hoc (`python -c`, screenshot): senza `TASKO_LANG=it` l'app parte in inglese
   (auto→locale container). Per output italiani: `TASKO_LANG=it` davanti al comando.
 - Screenshot SVG per cambi visivi: script con `TASKO_HOME` **fresca per run** (il restore del
