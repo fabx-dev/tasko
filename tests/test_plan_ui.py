@@ -8,7 +8,7 @@ from textual.widgets import Input, SelectionList
 
 import src.main as m
 from src.models import Priority
-from tests.conftest import commands_module, make_app, make_todo
+from tests.conftest import commands_module, make_app, make_todo, screen_texts
 
 
 def _day(offset: int) -> str:
@@ -75,8 +75,8 @@ def test_tagliati_non_preselezionati(tmp_files):
 
 
 def test_rientro_ricorda_scarti(tmp_files):
-    """Deseleziona -> conferma -> rientra: resta deselezionato con motivo;
-    riseleziona -> skip azzerato e ripianificato."""
+    """Deseleziona -> conferma -> rientra: pianificati nascosti, scarto in fondo
+    deselezionato con motivo; riseleziona -> skip azzerato e ripianificato."""
     from src.lang import T as _T
 
     async def t():
@@ -95,15 +95,16 @@ def test_rientro_ricorda_scarti(tmp_files):
             by_id = {t.id: t for t in app.todos}
             assert by_id[3].planned_for == ""
             assert by_id[3].plan_skip == _day(0)
-            # rientro: C deselezionato con motivo, gli altri selezionati
+            # rientro: 1,2 nascosti (gia' pianificati), solo C deselezionato
             app.action_plan_day()
             await pilot.pause()
             await pilot.pause()
             opts = app.screen.query_one("#planp-list", SelectionList)
-            assert set(opts.selected) == {1, 2}
+            assert [o.value for o in opts._options] == [3]
+            assert set(opts.selected) == set()
             labels = " ".join(str(o.prompt) for o in opts._options)
             assert _T("plan_skipped") in labels
-            # riseleziona C: skip azzerato
+            # riseleziona C: skip azzerato, 1,2 intoccati (additivo)
             opts.select(3)
             await pilot.press("ctrl+enter")
             await pilot.pause()
@@ -111,6 +112,41 @@ def test_rientro_ricorda_scarti(tmp_files):
             by_id = {t.id: t for t in app.todos}
             assert by_id[3].planned_for == _day(0)
             assert by_id[3].plan_skip == ""
+            assert by_id[1].planned_for == _day(0)
+            assert by_id[2].planned_for == _day(0)
+
+    asyncio.run(t())
+
+
+def test_piano_completo_e_additivo(tmp_files):
+    """Piano gia' fatto -> messaggio dedicato; conferma non toglie i pianificati."""
+
+    async def t():
+        todos = _todos()
+        for t in todos[:2]:
+            t.planned_for = _day(0)
+        app = make_app(todos)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            opts = app.screen.query_one("#planp-list", SelectionList)
+            assert {o.value for o in opts._options} == {3}
+            await pilot.press("ctrl+enter")
+            await pilot.pause()
+            await pilot.pause()
+            by_id = {t.id: t for t in app.todos}
+            assert by_id[1].planned_for == _day(0)
+            assert by_id[2].planned_for == _day(0)
+            assert by_id[3].planned_for == _day(0)
+            # ora tutto pianificato -> messaggio piano completo
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            from src.lang import T as _T
+
+            assert _T("planp_done") in screen_texts(app.screen)
 
     asyncio.run(t())
 

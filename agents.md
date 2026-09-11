@@ -137,8 +137,9 @@ Regole dure:
   (blocchi BINDINGS duplicati) — vedi §4.
 - **AI-3**: `src/plan.py` (`plan_day`: pesi espliciti, capacità ore/0.5, `plan_cut`, motivi
   `(chiave, params)`) + chiavi `plan_*` + `tests/test_plan.py` (9 scenari).
-- **AI-4**: `PlanProposalScreen` (tasto `P` + palette, preselezione inclusi, conferma =
-  piano di oggi esatto) + settings `day_hours`; `tests/test_plan_ui.py`. Lezione: `[]`
+- **AI-4**: `PlanProposalScreen` (tasto `P` + palette; conferma SOLO additiva: i già
+  pianificati non si ripropongono, per togliere c'è il piano `p` con `x`; scarti del
+  giorno in `plan_skip`) + settings `day_hours`; `tests/test_plan_ui.py`. Lezione: `[]`
   mangiati dal markup nelle option — vedi §4.
 - **AI-5**: `BriefingScreen` mattina/sera (solo composizione dati esistenti, zero rete) da
   palette; `tests/test_briefing.py`. Stop-criterion manuale: lettura reale 5 giorni.

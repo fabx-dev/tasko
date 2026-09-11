@@ -454,6 +454,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "planp_summary": "{n} proposti · {c} esclusi ({h}h)",
         "planp_empty": "[green]Niente da pianificare: nessun task attivo.[/]",
         "n_planp_saved": "Piano di oggi: {n} task.",
+        "planp_done": "[green]Piano di oggi completo: niente altro da proporre.[/]",
         "goals_title": "[b]Obiettivi[/b]",
         "goals_hint": "Task da completare. 0 = obiettivo disattivato.",
         "goals_daily": "Giornaliero (task):",
@@ -963,6 +964,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "planp_summary": "{n} proposed · {c} excluded ({h}h)",
         "planp_empty": "[green]Nothing to plan: no active tasks.[/]",
         "n_planp_saved": "Today plan: {n} tasks.",
+        "planp_done": "[green]Today plan complete: nothing else to propose.[/]",
         # Goals
         "goals_title": "[b]Goals[/b]",
         "goals_hint": "Tasks to complete. 0 = goal off.",

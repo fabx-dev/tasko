@@ -2236,6 +2236,15 @@ class PlanProposalScreen(ModalScreen[None]):
         except (ValueError, TypeError):
             self.hours = 6.0
         self.plan = plan_day(self.all_todos, today=self.today, hours=self.hours)
+        # Semantica additiva: i gia' pianificati non si ripropongono (per
+        # togliere c'e' il piano giorno con x). Restano nel computo capacita'.
+        planned_ids = {
+            t.id
+            for t in self.all_todos
+            if t.state == "attivo" and t.planned_for == self.today
+        }
+        self.n_planned = len(planned_ids)
+        self.plan = [row for row in self.plan if row[0] not in planned_ids]
         self.by_id = {t.id: t for t in self.all_todos if t.id is not None}
 
     @staticmethod
@@ -2289,8 +2298,8 @@ class PlanProposalScreen(ModalScreen[None]):
                     ],
                     id="planp-list",
                 )
-            else:
-                yield Static(T("planp_empty"))
+            elif self.n_planned or any(t.state == "attivo" for t in self.all_todos):
+                yield Static(T("planp_done" if self.n_planned else "planp_empty"))
             yield Static(T("rev_legend"), id="planp-legend")
             with Horizontal(id="planp-buttons"):
                 yield Button(T("form_save"), id="planp-confirm", variant="default")
@@ -2324,6 +2333,7 @@ class PlanProposalScreen(ModalScreen[None]):
             return set()
 
     def _confirm(self) -> None:
+        # Solo additivo: aggiunge i selezionati, non toglie mai i pianificati.
         selected = self._selected_ids()
         n = 0
         for t in self.all_todos:
@@ -2333,9 +2343,7 @@ class PlanProposalScreen(ModalScreen[None]):
                 t.planned_for = self.today
                 t.plan_skip = ""
                 n += 1
-            else:
-                if t.planned_for == self.today:
-                    t.planned_for = ""
+            elif t.planned_for != self.today:
                 t.plan_skip = self.today
         self.on_change()
         self.notify(T("n_planp_saved", n=n))
