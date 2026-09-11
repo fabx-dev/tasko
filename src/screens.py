@@ -4227,7 +4227,7 @@ class MenuScreen(ModalScreen[str | None]):
 
     CSS = """
     #menu-box {
-        width: 88;
+        width: 84;
         max-width: 94%;
         height: 90%;
         max-height: 90%;
@@ -4252,7 +4252,9 @@ class MenuScreen(ModalScreen[str | None]):
     #menu-bar {
         width: 24;
         height: 100%;
-        margin-right: 2;
+        margin-right: 1;
+        border: solid $primary;
+        background: $surface;
     }
     #menu-bar MenuRow {
         width: 100%;
