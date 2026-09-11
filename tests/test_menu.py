@@ -93,11 +93,6 @@ def _bar_cats(screen):
 def _drop_items(screen):
     if getattr(screen, "_open_idx", None) is None:
         return []
-    try:
-        if screen.query_one("#menu-drop-row").has_class("hidden"):
-            return []
-    except Exception:
-        return []
     return [b.id for b in screen.query(f"#menu-drop-{screen._open_idx} Button")]
 
 
@@ -120,10 +115,13 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
             await pilot.pause()
             assert type(app.screen).__name__ == "MenuScreen"
             _no_debounce(app.screen)
-            # ramo principale: solo le 4 categorie, nessun dropdown aperto
+            # sinistra: solo le 4 voci; destra: segnaposto, nessun sottomenu
             assert len(_bar_cats(app.screen)) == 4
             assert _drop_items(app.screen) == []
-            # click apre il dropdown sotto la voce
+            from tests.conftest import screen_texts
+
+            assert T("menu_pick") in screen_texts(app.screen)
+            # click apre il sottomenu a destra
             await pilot.click("#menu-cat-0")
             assert await _wait_for(pilot, lambda: len(_drop_items(app.screen)) >= 5)
             assert T("menu_review_t") in _drop_labels(app.screen)
@@ -131,12 +129,12 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
             await pilot.click("#menu-cat-0")
             assert await _wait_for(pilot, lambda: _drop_items(app.screen) == [])
             assert len(_bar_cats(app.screen)) == 4
-            # altra voce: dropdown con le sue voci
+            # altra voce: sottomenu con le sue voci
             await pilot.click("#menu-cat-1")
             assert await _wait_for(
                 pilot, lambda: T("menu_cal_t") in _drop_labels(app.screen)
             )
-            # esc chiude il dropdown, resto nel menu
+            # esc chiude il sottomenu, resto nel menu
             await pilot.press("escape")
             await pilot.pause()
             await pilot.pause()
@@ -192,33 +190,45 @@ def test_frecce_ed_enter_da_tastiera(tmp_files):
             await pilot.pause()
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
-            # destra/sinistra tra le voci principali
-            await pilot.press("right")
-            await pilot.pause()
-            assert getattr(app.screen.focused, "id", None) == "menu-cat-1"
-            await pilot.press("left")
-            await pilot.pause()
-            assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
-            # giu apre il dropdown e va alla prima voce
+            assert _drop_items(app.screen) == []
+            # giu/su scorrono le voci con anteprima del sottomenu a destra
             await pilot.press("down")
             await pilot.pause()
-            await pilot.pause()
-            assert len(_drop_items(app.screen)) >= 5
-            assert getattr(app.screen.focused, "id", None) == "menu-item-0-0"
-            # su torna alla voce principale senza chiudere
+            assert getattr(app.screen.focused, "id", None) == "menu-cat-1"
+            assert T("menu_cal_t") in _drop_labels(app.screen)
             await pilot.press("up")
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
-            assert len(_drop_items(app.screen)) >= 5
-            # giu+giu+enter sulla terza voce di Sistema = Pulisci filtri
-            # (destra con dropdown aperto cambia categoria e va in testa)
+            assert T("menu_review_t") in _drop_labels(app.screen)
+            # destra entra nel sottomenu, su torna alla voce
             await pilot.press("right")
-            await pilot.press("right")
+            await pilot.pause()
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "menu-item-0-0"
+            await pilot.press("down")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "menu-item-0-1"
+            await pilot.press("up")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "menu-item-0-0"
+            await pilot.press("up")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
+            # sinistra sulla voce non fa nulla, poi giu fino a Sistema
+            await pilot.press("left")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
+            await pilot.press("down")
+            await pilot.press("down")
+            await pilot.press("down")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "menu-cat-3"
+            assert T("menu_settings_t") in _drop_labels(app.screen)
+            # destra + giu + enter sulla terza voce = Pulisci filtri
             await pilot.press("right")
             await pilot.pause()
             await pilot.pause()
             assert getattr(app.screen.focused, "id", None) == "menu-item-3-0"
-            assert T("menu_settings_t") in _drop_labels(app.screen)
             await pilot.press("down")
             await pilot.pause()
             await pilot.press("down")
@@ -241,6 +251,7 @@ def test_nuove_chiavi_parita_it_en(tmp_files):
         "menu_cat_sys_t",
         "menu_title",
         "menu_hint",
+        "menu_pick",
         "menu_dayplan_t",
         "menu_cal_t",
         "menu_week_t",

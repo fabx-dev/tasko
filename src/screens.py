@@ -4185,61 +4185,58 @@ class HealthScreen(ModalScreen[None]):
 
 
 class MenuScreen(ModalScreen[str | None]):
-    """Menubar per funzioni: 4 voci principali + dropdown a tendina.
+    """Menu per funzioni: voci a sinistra, sottomenu a destra.
 
     Riceve categorie gia' risolte nella lingua corrente:
     [(titolo_cat, aiuto_cat, [(titolo, aiuto, action, shortcut|None), ...]), ...].
-    Il ramo principale mostra solo i titoli delle categorie; click/Enter su una
-    voce apre il dropdown sotto di essa (spostato leggermente a destra),
-    un nuovo click sulla stessa voce lo chiude. Frecce sinistra/destra tra le
-    voci, su/giu dentro il dropdown, Enter esegue, esc chiude dropdown/menu.
+    La colonna di sinistra mostra solo i titoli delle categorie; click/Enter su
+    una voce apre il sottomenu nel pannello di destra, un nuovo click sulla
+    stessa voce lo chiude. Tutto allineato a sinistra. Su/giu scorrono le voci
+    (con anteprima) e le righe del sottomenu, destra/Enter entra ed esegue,
+    sinistra torna alle voci, esc chiude sottomenu/menu.
     Il dismiss ritorna il nome dell'action scelta (es. "action_open_settings")
     oppure None se chiuso senza scelta. Non importa mai app/commands.
     """
 
-    DROP_W = 52
-
     CSS = """
     #menu-box {
-        width: 78;
+        width: 84;
         max-width: 94%;
         height: 90%;
         max-height: 90%;
     }
+    #menu-title {
+        text-align: left;
+    }
+    #menu-main {
+        width: 100%;
+        height: 1fr;
+        margin-bottom: 1;
+    }
     #menu-bar {
+        width: 24;
+        height: 100%;
+        margin-right: 2;
+    }
+    #menu-bar Button {
         width: 100%;
         height: 3;
         margin-bottom: 1;
-    }
-    #menu-bar Button {
-        width: 1fr;
-        min-width: 10;
-        height: 3;
-        margin: 0 1;
+        text-align: left;
+        content-align: left middle;
     }
     #menu-bar Button.active {
         text-style: bold;
         background: $primary-darken-2;
     }
-    #menu-drop-row {
-        width: 100%;
-        height: 1fr;
-    }
-    #menu-drop-row.hidden {
-        display: none;
+    #menu-drop {
+        width: 1fr;
+        height: 100%;
+        border: solid $primary;
+        background: $surface;
     }
     #menu-drop .hidden {
         display: none;
-    }
-    #menu-drop-spacer {
-        height: 1;
-    }
-    #menu-drop {
-        width: 52;
-        max-width: 100%;
-        height: auto;
-        border: solid $primary;
-        background: $surface;
     }
     #menu-drop Button {
         width: 100%;
@@ -4247,11 +4244,18 @@ class MenuScreen(ModalScreen[str | None]):
         height: 3;
         margin-bottom: 0;
         border: none;
+        text-align: left;
+        content-align: left middle;
+    }
+    #menu-empty {
+        height: auto;
+        padding: 1 2;
+        color: $text-muted;
     }
     #menu-hint {
         height: auto;
         color: $text-muted;
-        text-align: center;
+        text-align: left;
         margin-bottom: 1;
     }
     """
@@ -4275,14 +4279,15 @@ class MenuScreen(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="menu-box"):
             yield Label(T("menu_title"), id="menu-title")
-            with Horizontal(id="menu-bar"):
-                # Niente tooltip sulle voci: l'overlay del tooltip intercetta
-                # i click sintetici del Pilot (mouse fermo) e il toggle diventa flaky.
-                for i, (ct, _ch, _items) in enumerate(self.categories):
-                    yield Button(ct, id=f"menu-cat-{i}", variant="default")
-            with Horizontal(id="menu-drop-row", classes="hidden"):
-                yield Static("", id="menu-drop-spacer")
+            yield Label(T("menu_hint"), id="menu-hint")
+            with Horizontal(id="menu-main"):
+                with Vertical(id="menu-bar"):
+                    # Niente tooltip sulle voci: l'overlay del tooltip intercetta
+                    # i click sintetici del Pilot (mouse fermo) e il toggle diventa flaky.
+                    for i, (ct, _ch, _items) in enumerate(self.categories):
+                        yield Button(ct, id=f"menu-cat-{i}", variant="default")
                 with VerticalScroll(id="menu-drop", can_focus=False):
+                    yield Static(T("menu_pick"), id="menu-empty")
                     for gi, (_ct, _ch, gitems) in enumerate(self.categories):
                         with Vertical(
                             id=f"menu-drop-{gi}", classes="menu-drop-group hidden"
@@ -4294,7 +4299,6 @@ class MenuScreen(ModalScreen[str | None]):
                                     id=f"menu-item-{gi}-{gj}",
                                     variant="default",
                                 )
-            yield Label(T("menu_hint"), id="menu-hint")
             yield Button(T("ui_close_esc"), id="menu-close", variant="default")
 
     def on_mount(self) -> None:
@@ -4360,38 +4364,24 @@ class MenuScreen(ModalScreen[str | None]):
             except Exception:
                 pass
 
-    def _drop_offset(self, i: int) -> int:
-        try:
-            btn = self.query_one(f"#menu-cat-{i}", Button)
-            row = self.query_one("#menu-drop-row", Horizontal)
-            off = int(btn.region.x - row.region.x) + 2
-            room = int(row.size.width) - self.DROP_W
-            return max(0, min(off, max(0, room)))
-        except Exception:
-            return min(i * 18 + 2, 20)
-
-    # -- apertura/chiusura dropdown --------------------------------------
-    def _open(self, i: int, focus_item: int = 0) -> None:
+    # -- apertura/chiusura sottomenu --------------------------------------
+    def _open(self, i: int, focus_item: int | None = 0) -> None:
         if not 0 <= i < len(self.categories):
             return
         self._open_idx = i
         try:
             for gi in range(len(self.categories)):
                 self.query_one(f"#menu-drop-{gi}").set_class(gi != i, "hidden")
-            self.query_one("#menu-drop-row", Horizontal).remove_class("hidden")
+            self.query_one("#menu-empty", Static).add_class("hidden")
         except Exception:
             pass
         self._set_active(i)
+        if focus_item is None:
+            return
 
         def _defer() -> None:
             if self._open_idx != i:
                 return
-            try:
-                self.query_one(
-                    "#menu-drop-spacer", Static
-                ).styles.width = self._drop_offset(i)
-            except Exception:
-                pass
             self._focus_item(i, focus_item)
 
         try:
@@ -4403,7 +4393,9 @@ class MenuScreen(ModalScreen[str | None]):
         idx = self._open_idx
         self._open_idx = None
         try:
-            self.query_one("#menu-drop-row", Horizontal).add_class("hidden")
+            for gi in range(len(self.categories)):
+                self.query_one(f"#menu-drop-{gi}").add_class("hidden")
+            self.query_one("#menu-empty", Static).remove_class("hidden")
         except Exception:
             pass
         self._set_active(None)
@@ -4438,24 +4430,16 @@ class MenuScreen(ModalScreen[str | None]):
 
     # -- tastiera: frecce + esc ------------------------------------------
     def action_cursor_left(self) -> None:
-        cur = self._focused_cat()
-        if cur is None:
-            cur = self._open_idx if self._open_idx is not None else 0
-        nxt = (cur - 1) % len(self.categories)
-        if self._open_idx is None:
-            self._focus_cat(nxt)
-        else:
-            self._open(nxt)
+        focused = self._focused_item()
+        if focused is not None:
+            self._focus_cat(focused[0])
 
     def action_cursor_right(self) -> None:
-        cur = self._focused_cat()
-        if cur is None:
-            cur = self._open_idx if self._open_idx is not None else 0
-        nxt = (cur + 1) % len(self.categories)
-        if self._open_idx is None:
-            self._focus_cat(nxt)
-        else:
-            self._open(nxt)
+        cat = self._focused_cat()
+        if cat is not None:
+            self._open(cat, focus_item=0)
+        elif self._open_idx is None:
+            self._open(0, focus_item=0)
 
     def action_cursor_down(self) -> None:
         focused = self._focused_item()
@@ -4465,16 +4449,26 @@ class MenuScreen(ModalScreen[str | None]):
                 self._focus_item(focused[0], (focused[1] + 1) % len(items))
             return
         cat = self._focused_cat()
-        self._open(cat if cat is not None else 0)
+        if cat is None:
+            cat = self._open_idx if self._open_idx is not None else 0
+        nxt = (cat + 1) % len(self.categories)
+        self._open(nxt, focus_item=None)
+        self._focus_cat(nxt)
 
     def action_cursor_up(self) -> None:
         focused = self._focused_item()
-        if focused is None:
+        if focused is not None:
+            if focused[1] <= 0:
+                self._focus_cat(focused[0])
+            else:
+                self._focus_item(focused[0], focused[1] - 1)
             return
-        if focused[1] <= 0:
-            self._focus_cat(focused[0])
-        else:
-            self._focus_item(focused[0], focused[1] - 1)
+        cat = self._focused_cat()
+        if cat is None:
+            cat = self._open_idx if self._open_idx is not None else 0
+        nxt = (cat - 1) % len(self.categories)
+        self._open(nxt, focus_item=None)
+        self._focus_cat(nxt)
 
     def action_close_or_shrink(self) -> None:
         if self._open_idx is not None:

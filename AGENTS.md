@@ -29,7 +29,7 @@ mattina / resoconto sera (solo palette, zero rete).
 src/main.py      entry point + re-export compatibilità + init lingua PRIMA degli import
 src/app.py       TodoApp(App): orchestratore (~2400 righe, 125 metodi) — è la god-class nota
 src/screens.py   32 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback;
-                 MenuScreen menubar (4 voci -> dropdown, dismiss = nome action)
+                 MenuScreen a 2 colonne (voci a sx -> sottomenu a dx,
 src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen;
                  sigilli #tag *progetto !prio ~stima //note, parse_with_found() per merge
 src/plan.py      plan_day() pura: score, capacita' ore/0.5 🍅, motivi (chiave, params)
@@ -153,16 +153,15 @@ Regole dure:
   mangiati dal markup nelle option — vedi §4.
 - **AI-5**: `BriefingScreen` mattina/sera (solo composizione dati esistenti, zero rete) da
   palette; `tests/test_briefing.py`. Stop-criterion manuale: lettura reale 5 giorni.
-- **Menu**: `m` = `MenuScreen` menubar (4 voci da `MENU_STRUCTURE` in
-  `commands.py`: click/Enter apre il dropdown sotto la voce, spostato a destra
-  via spacer; nuovo click = toggle; frecce + Enter da tastiera, esc chiude),
+- **Menu**: `m` = `MenuScreen` a 2 colonne (voci a sx -> sottomenu a dx,
+  tutto allineato a sinistra; click/Enter apre, nuovo click = toggle;
+  frecce + Enter da tastiera, esc chiude),
   `ctrl+p` resta palette (`TaskoMenuProvider`, titoli "Categoria › Voce");
   menu completo anche delle azioni con tasto; `tests/test_menu.py`.
   Lezioni: gruppi dropdown pre-costruiti e commutati via classi (remove+mount
-  rapidi in sequenza danno `DuplicateIds`); offset/spacer e focus via
-  `call_after_refresh` con guardia su `_open_idx` (le region a riga nascosta
-  sono zero); dopo `remove_children`+`mount` il focus resta sul widget
-  rimosso — `set_focus(None)` + `call_after_refresh`.
+  rapidi in sequenza danno `DuplicateIds`); focus via
+  `call_after_refresh` con guardia su `_open_idx`; dopo `remove_children`+`mount`
+  il focus resta sul widget rimosso — `set_focus(None)` + `call_after_refresh`.
 - **Test Pilot**: `pilot.click` ravvicinati sullo stesso `Button` sono inghiottiti
   dal debounce visivo (`-active` 0.2s in `Button._on_click`) — nei test con
   toggle azzerare `active_effect_duration`; dopo i click usare attesa a
