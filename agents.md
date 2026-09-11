@@ -19,22 +19,27 @@ Feature principali: task con 3 stati, sotto-task annidati, ricorrenze, progetti/
 kanban (mini in home + full), calendario, settimana, piano giornaliero, pomodoro persistente
 a cicli, template (creabili, anche da progetto), statistiche, goals, salute progetti,
 archivio, backup/snapshot zip, import/export CSV + export Markdown, cifratura Fernet opzionale,
-onboarding demo, **chiusura giornata** (review serale, tasto `R`).
+onboarding demo, **chiusura giornata** (review serale, tasto `R`), inserimento in
+linguaggio naturale (form `ctrl+l`, CLI add), piano smart (tasto `P`), briefing
+mattina / resoconto sera (solo palette, zero rete).
 
 ## 2. Mappa del codice
 
 ```
 src/main.py      entry point + re-export compatibilità + init lingua PRIMA degli import
 src/app.py       TodoApp(App): orchestratore (~2400 righe, 125 metodi) — è la god-class nota
-src/screens.py   27 modali (solo models/storage/lang, mai app) — comunicano via push_screen+callback
+src/screens.py   30 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback
+src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen
+src/plan.py      plan_day() pura: score, capacita' ore/0.5 🍅, motivi (chiave, params)
 src/models.py    TodoItem, Priority, Recurrence, validazioni date, MAX_DEPTH=6
 src/store.py     TodoStore: lookup id, mutazioni, next_id, commit() = UNICO punto di scrittura todos
-src/storage.py   paths, load/save (todos/template/config/archive/pomodoro), lock, merge, backup
+src/storage.py   paths, load/save (todos/template/config/archive/pomodoro), lock, merge, backup;
+                 config include day_hours (default 6, clamp 1-16)
 src/crypto.py    Fernet + PBKDF2 (600k iter), chiave solo in RAM, envelope {"v","salt","data"}
-src/cli.py       add/list/done/show (add/done via TodoStore: lock+merge gratis)
-src/commands.py  TaskoMenuProvider (palette `m` / ctrl+p): solo voci senza tasto globale
+src/cli.py       add/list/done/show (add/done via TodoStore: lock+merge gratis); add senza flag = NL
+src/commands.py  TaskoMenuProvider (palette `m` / ctrl+p): voci senza tasto, tranne planner (`P`)
 src/lang.py      catalogo STRINGS it/en + key_sections (help) — vedi §4
-tests/           ~76 test; conftest.py con fixture di isolamento (vedi §5)
+tests/           ~104 test; conftest.py con fixture di isolamento (vedi §5)
 ```
 
 Flusso dati standard nelle action: muta oggetti → `store` → `_save_data()` (= `store.commit()`)
@@ -67,7 +72,17 @@ Regole dure:
 - **Bottoni**: tutti `variant="default"`; coppie azione = `form_save` ("Salva [ctrl+enter]") +
   `form_cancel` ("Annulla [esc]"); solo visione = `ui_close_esc` ("Chiudi [escape]").
 - **Tasti globali**: superficie già ampia (~30 binding). Nuovi tasti solo su richiesta esplicita;
-  preferire palette/menu. Convenzione maiuscole = variante (`b/B`, `o/O`, `r` ricarica / `R` review).
+  preferire palette/menu. Convenzione maiuscole = variante (`b/B`, `o/O`, `r` ricarica / `R` review;
+  eccezione approvata: `P` = piano smart, coppia di `p` = piano giorno).
+- **Nuove screen con lista scrollabile**: box ad altezza definita (`height: 90%`) + figlio
+  flessibile (`height: 1fr`) — MAI box auto + `max-height` con figli auto (lezione stats:
+  il contenuto sborda o avanza cornice vuota). Vale anche per future revisioni di
+  plan-box/rev-box/arc-box (ancora al pattern vecchio).
+- **SelectionList**: le label interpretano il markup Rich — niente `[...]` nelle option
+  (vengono mangiate come tag di stile); usare parentesi tonde. Precedente: motivo
+  di taglio sparito dal piano smart.
+- **Edit**: blocchi BINDINGS/CSS duplicati tra classi diverse (es. form vs import-CSV):
+  usare sempre contesto ampio in oldString e verificare con grep dove è finito l'edit.
 - **Mai crash da UI**: except ampi intenzionali (ruff esclude BLE/S110/S112 di proposito).
 - Date wall-time `"YYYY-MM-DD [HH:MM]"` (niente aware — romperebbe i dati, ruff esclude DTZ).
 - `ruff check` **E** `ruff format --check` (la CI li corre entrambi + pytest su 3.12 e 3.13).
@@ -82,9 +97,14 @@ Regole dure:
 - Pilot Textual: `async with app.run_test(size=(120, 40))`, `await pilot.pause()` doppia dopo
   le action modali. `SelectionList`: option `(label, value, selected_init)`, metodi
   `select/deselect/toggle(value)`, prop `selected`.
+- Testo screen nei test: helper `screen_texts()` di conftest (gestisce `.content`/`.renderable`);
+  attese via `T(chiave)` non stringhe hardcodate (la lingua effettiva dipende dall'env).
+- Script ad-hoc (`python -c`, screenshot): senza `TASKO_LANG=it` l'app parte in inglese
+  (auto→locale container). Per output italiani: `TASKO_LANG=it` davanti al comando.
 - Screenshot SVG per cambi visivi: script con `TASKO_HOME` **fresca per run** (il restore del
-  pomodoro altera i run successivi!), normalizzare le cifre, confrontare per righe di testo
-  con coordinate y arrotondate a int (le coordinate sub-pixel fluttuano). Byte-compare = falso.
+  pomodoro altera i run successivi!), estrazione testo via regex `<text>` + `html.unescape`
+  (gli spazi sono `&#160;`: normalizzare prima di cercare), verifica sopra+SOTTO il fold
+  (`scroll_end` per i bottoni). Byte-compare = falso.
 - LockScreen nei test ad-hoc = file reali cifrati sotto `~`: usare sempre `TASKO_HOME` isolata.
 
 ## 6. Git e CI
@@ -108,13 +128,31 @@ Regole dure:
 - **S5**: `ReviewScreen` (riepilogo oggi vs goal + pomodori, `SelectionList` candidati con top-3
   preselezionati, conferma = piano di domani esatto); ingresso da palette/menu + tasto `R`;
   `test_review.py`. Fix successivi: bottoni uniformati, box 100 col, label help "chiusura giornata".
+- **AI-1**: `src/nlparse.py` (`parse(text, lang)` → dict del form; `#tag *progetto !prio ~stima`,
+  date it/en, regole ambiguità nel docstring) + `tests/test_nlparse.py` (57 it + 49 en).
+- **AI-2**: `ctrl+l` nel form (pre-compila + anteprima persistente) + `tasko add "<frase>"` NL
+  (con flag = modalità classica, titolo alla lettera); chiavi `nl_*`, `cli_empty_title`;
+  `tests/test_nl_integration.py`. Lezione: binding finito per sbaglio su ImportCsvScreen
+  (blocchi BINDINGS duplicati) — vedi §4.
+- **AI-3**: `src/plan.py` (`plan_day`: pesi espliciti, capacità ore/0.5, `plan_cut`, motivi
+  `(chiave, params)`) + chiavi `plan_*` + `tests/test_plan.py` (9 scenari).
+- **AI-4**: `PlanProposalScreen` (tasto `P` + palette, preselezione inclusi, conferma =
+  piano di oggi esatto) + settings `day_hours`; `tests/test_plan_ui.py`. Lezione: `[]`
+  mangiati dal markup nelle option — vedi §4.
+- **AI-5**: `BriefingScreen` mattina/sera (solo composizione dati esistenti, zero rete) da
+  palette; `tests/test_briefing.py`. Stop-criterion manuale: lettura reale 5 giorni.
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 
-- **Sync**: file-sync (Syncthing/Nextcloud, economico ma cieco) vs server Tasko vs SQLite+replica
-  vs CRDT vs BaaS — vedi thread in chat. Dubbi utente sul file-sync ancora aperti.
+- **Sync**: accantonato (idee non chiare) — file-sync vs server vs SQLite+replica vs CRDT
+  vs BaaS, vedi thread in chat. Non riaprire di iniziativa.
+- **AI provider / Sprint AI-6** (condizionato): parte SOLO se il briefing (AI-5) viene letto
+  5 giorni di fila. Design fissato: interfaccia `AIProvider` (Null/Cloud BYOK/locale-stub),
+  chiave SOLO da `TASKO_AI_KEY` o file 0600 (mai nel config in chiaro), endpoint
+  OpenAI-compatible configurabile, chiamate solo via `run_worker` con fallback a template,
+  preview-consenso prima di ogni invio cloud, zero rete nei test (fake provider).
 - **Web app sullo stesso backend** (proposta utente): opzioni A read-only → B server locale CRUD
   (TUI/CLI client, telefono via LAN) → C hosting pubblico. Serve risposta a: basta la LAN?
   autostart invisibile? stack Python+template o altro? Slice A come validazione con stop se inutile.
-- Prossimi quick-win mai partiti: stima durata + "smart oggi", export iCal.
+- Quick-win rimasti: export iCal. ("Smart oggi" fatto dal planner; stime esistevano già.)
 - Pomodoro cross-device dichiarato fuori scope v1 (timer resta locale).
