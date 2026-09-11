@@ -4229,8 +4229,9 @@ class MenuScreen(ModalScreen[str | None]):
     #menu-box {
         width: 80;
         max-width: 94%;
-        height: 30;
-        max-height: 90%;
+        height: 100%;
+        max-height: 100%;
+        dock: right;
     }
     #menu-title {
         text-align: left;
