@@ -4,8 +4,9 @@ import argparse
 import sys
 from datetime import datetime
 
-from src.lang import T
+from src.lang import T, get_lang
 from src.models import Priority, TodoItem, _is_valid_date, _normalize_date
+from src.nlparse import parse
 from src.storage import load_todos
 from src.store import TodoStore
 
@@ -75,18 +76,45 @@ def _cli_main(argv: list[str]) -> int:
         print(f"tasko: {msg}", file=sys.stderr)
 
     if args.cmd == "add":
-        due = _normalize_date(args.due) if args.due else ""
-        if args.due and not _is_valid_date(due):
-            err(T("cli_bad_date", d=args.due))
-            return 2
-        store = TodoStore.load()
-        todo = TodoItem(
-            title=args.title.strip(),
-            priority=_cli_parse_priority(args.priority),
-            due=due,
-            project=(args.project or "").strip().lower(),
-            tags=[t.strip().lower() for t in (args.tags or "").split(",") if t.strip()],
+        classic = bool(
+            args.project or args.due or args.tags or args.priority != "media"
         )
+        if classic:
+            # Modalita' classica: titolo alla lettera, flag espliciti.
+            title = args.title.strip()
+            if not title:
+                err(T("cli_empty_title"))
+                return 2
+            due = _normalize_date(args.due) if args.due else ""
+            if args.due and not _is_valid_date(due):
+                err(T("cli_bad_date", d=args.due))
+                return 2
+            todo = TodoItem(
+                title=title,
+                priority=_cli_parse_priority(args.priority),
+                due=due,
+                project=(args.project or "").strip().lower(),
+                tags=[
+                    t.strip().lower() for t in (args.tags or "").split(",") if t.strip()
+                ],
+            )
+        else:
+            # Modalita' NL: tutti i campi dalla frase, flag assenti.
+            res = parse(args.title, get_lang())
+            title = res["title"].strip()
+            if not title:
+                err(T("cli_empty_title"))
+                return 2
+            todo = TodoItem(
+                title=title,
+                priority=res["priority"],
+                due=res["due"],
+                project=res["project"],
+                tags=res["tags"],
+                recurrence=res["recurrence"],
+                stima_pomo=res["stima_pomo"],
+            )
+        store = TodoStore.load()
         store.add(todo)
         store.commit()
         print(todo.id)

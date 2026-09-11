@@ -1,4 +1,4 @@
-"""Schermate modali (viste). Dipendono solo da models/storage/lang."""
+"""Schermate modali (viste). Dipendono solo da models/storage/lang/nlparse."""
 
 import calendar
 from datetime import datetime, timedelta
@@ -23,6 +23,7 @@ from src.lang import (
     T,
     days_long,
     days_short,
+    get_lang,
     key_sections,
     months,
     prio_disp,
@@ -44,6 +45,7 @@ from src.models import (
     _pomo_label,
     _status,
 )
+from src.nlparse import parse
 from src.storage import _backup_sources, snapshot_info
 
 
@@ -84,6 +86,10 @@ class TodoFormScreen(ModalScreen[dict | None]):
     #title-input {
         border: solid $primary-darken-1;
         padding: 0 1;
+    }
+    #nl-preview {
+        height: auto;
+        margin-bottom: 1;
     }
     #form-body Label {
         margin-bottom: 0;
@@ -147,6 +153,7 @@ class TodoFormScreen(ModalScreen[dict | None]):
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
         Binding("ctrl+enter", "submit", "Salva", show=False),
+        Binding("ctrl+l", "fill_nl", "Compila", show=False),
     ]
 
     def __init__(
@@ -163,6 +170,7 @@ class TodoFormScreen(ModalScreen[dict | None]):
                 yield Label(self.screen_title, id="form-title")
             with VerticalScroll(id="form-body", can_focus=False):
                 yield Input(placeholder=T("form_title_ph"), id="title-input")
+                yield Label(f"[dim]{T('nl_hint')}[/]", id="nl-preview")
                 yield Label(T("form_notes"))
                 yield TextArea("", id="notes-textarea")
                 with Horizontal(id="row-prog-due"):
@@ -226,6 +234,41 @@ class TodoFormScreen(ModalScreen[dict | None]):
 
     def action_submit(self) -> None:
         self._submit()
+
+    def action_fill_nl(self) -> None:
+        """Compila i campi dal titolo in linguaggio naturale (ctrl+l)."""
+        raw = self.query_one("#title-input", Input).value.strip()
+        if not raw:
+            self.notify(T("n_title_req"), severity="warning")
+            return
+        res = parse(raw, get_lang())
+        self.query_one("#title-input", Input).value = res["title"]
+        self.query_one("#due-input", Input).value = res["due"]
+        self.query_one("#project-input", Input).value = res["project"]
+        self.query_one("#tags-input", Input).value = ", ".join(res["tags"])
+        stima = int(res["stima_pomo"] or 0)
+        self.query_one("#stima-input", Input).value = str(stima) if stima else ""
+        self.query_one("#priority-select", Select).value = res["priority"]
+        self.query_one("#recurrence-select", Select).value = res["recurrence"]
+        self.query_one("#nl-preview", Label).update(self._nl_summary(res))
+
+    @staticmethod
+    def _nl_summary(res: dict) -> str:
+        parts = []
+        if res["due"]:
+            parts.append(res["due"])
+        if res["project"]:
+            parts.append(f"*{res['project']}")
+        parts.extend(f"#{t}" for t in res["tags"])
+        if res["priority"] != Priority.MEDIUM:
+            parts.append(f"!{res['priority'].value}")
+        if res["recurrence"] != Recurrence.NONE:
+            parts.append(rec_disp(res["recurrence"].value))
+        if int(res["stima_pomo"] or 0):
+            parts.append(f"~{res['stima_pomo']}")
+        if not parts:
+            return f"[dim]{T('nl_none')}[/]"
+        return T("nl_preview", s=" · ".join(parts))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel-btn":
@@ -1034,7 +1077,7 @@ class ImportCsvScreen(ModalScreen[str | None]):
 
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
-        Binding("ctrl+enter", "submit", "Importa", show=False),
+        Binding("ctrl+enter", "submit", "Salva", show=False),
     ]
 
     def __init__(self, files: list[Path]) -> None:
