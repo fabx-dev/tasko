@@ -16,7 +16,7 @@ from textual.widgets import (
 )
 
 from src import crypto as _crypto
-from src.commands import TaskoMenuProvider
+from src.commands import TaskoMenuProvider, menu_categories
 from src.lang import T, prio_disp, rec_disp
 from src.models import (
     MAX_DEPTH,
@@ -44,6 +44,7 @@ from src.screens import (
     KanbanScreen,
     KeysScreen,
     LockScreen,
+    MenuScreen,
     PasswordScreen,
     PlanProposalScreen,
     PomodoroScreen,
@@ -265,14 +266,15 @@ class TodoApp(App):
     #state-box, #theme-box, #search-box, #week-box, #tpl-box, #tplc-box,
     #tplp-box, #impcsv-box, #pomo-box, #kb-box, #detail-box, #day-box,
     #calendar-box, #plan-box, #goals-box, #stats-box, #keys-box, #set-box,
-    #arc-box, #rst-box, #wel-box, #pw-box, #sec-box, #hea-box, #rev-box {
+    #arc-box, #rst-box, #wel-box, #pw-box, #sec-box, #hea-box, #rev-box,
+    #menu-box {
         border: thick $primary;
         background: $surface;
         padding: 1 2;
     }
     #tpl-title, #tplc-title, #tplp-title, #impcsv-title, #goals-title,
     #keys-title, #set-title, #arc-title, #rst-title, #wel-title,
-    #pw-title, #sec-title, #rev-title {
+    #pw-title, #sec-title, #rev-title, #menu-title {
         text-align: center;
         text-style: bold;
         color: $primary;
@@ -280,7 +282,7 @@ class TodoApp(App):
         height: auto;
     }
     #theme-close, #kb-close, #day-close, #calendar-close, #plan-close,
-    #stats-close {
+    #stats-close, #menu-close {
         width: 100%;
         min-width: 16;
         height: 3;
@@ -331,12 +333,10 @@ class TodoApp(App):
             show=False,
             tooltip=T("menu_tooltip"),
         ),
-        Binding(
-            "m", "command_palette", T("b_menu"), show=False, tooltip=T("menu_tooltip")
-        ),
+        Binding("m", "open_menu", T("b_menu"), show=False, tooltip=T("menu_tooltip")),
     ]
 
-    COMMAND_PALETTE_BINDING = "m"
+    COMMAND_PALETTE_BINDING = "ctrl+p"
 
     COMMANDS = App.COMMANDS | {TaskoMenuProvider}
 
@@ -354,11 +354,23 @@ class TodoApp(App):
         )
 
     def action_command_palette(self) -> None:
-        """Mostra il menu localizzato."""
+        """Mostra la palette comandi (ricerca globale)."""
         if self.use_command_palette and not CommandPalette.is_open(self):
             self.push_screen(
                 CommandPalette(id="--command-palette", placeholder=T("pal_placeholder"))
             )
+
+    def action_open_menu(self) -> None:
+        """Apre il menu per funzioni (categorie -> voci)."""
+
+        def on_pick(action_name: str | None) -> None:
+            if not action_name:
+                return
+            callback = getattr(self, action_name, None)
+            if callable(callback):
+                callback()
+
+        self.push_screen(MenuScreen(menu_categories()), on_pick)
 
     def __init__(self) -> None:
         super().__init__()

@@ -4182,3 +4182,300 @@ class HealthScreen(ModalScreen[None]):
 
     def action_close(self) -> None:
         self.dismiss()
+
+
+class MenuScreen(ModalScreen[str | None]):
+    """Menubar per funzioni: 4 voci principali + dropdown a tendina.
+
+    Riceve categorie gia' risolte nella lingua corrente:
+    [(titolo_cat, aiuto_cat, [(titolo, aiuto, action, shortcut|None), ...]), ...].
+    Il ramo principale mostra solo i titoli delle categorie; click/Enter su una
+    voce apre il dropdown sotto di essa (spostato leggermente a destra),
+    un nuovo click sulla stessa voce lo chiude. Frecce sinistra/destra tra le
+    voci, su/giu dentro il dropdown, Enter esegue, esc chiude dropdown/menu.
+    Il dismiss ritorna il nome dell'action scelta (es. "action_open_settings")
+    oppure None se chiuso senza scelta. Non importa mai app/commands.
+    """
+
+    DROP_W = 52
+
+    CSS = """
+    #menu-box {
+        width: 78;
+        max-width: 94%;
+        height: 90%;
+        max-height: 90%;
+    }
+    #menu-bar {
+        width: 100%;
+        height: 3;
+        margin-bottom: 1;
+    }
+    #menu-bar Button {
+        width: 1fr;
+        min-width: 10;
+        height: 3;
+        margin: 0 1;
+    }
+    #menu-bar Button.active {
+        text-style: bold;
+        background: $primary-darken-2;
+    }
+    #menu-drop-row {
+        width: 100%;
+        height: 1fr;
+    }
+    #menu-drop-row.hidden {
+        display: none;
+    }
+    #menu-drop .hidden {
+        display: none;
+    }
+    #menu-drop-spacer {
+        height: 1;
+    }
+    #menu-drop {
+        width: 52;
+        max-width: 100%;
+        height: auto;
+        border: solid $primary;
+        background: $surface;
+    }
+    #menu-drop Button {
+        width: 100%;
+        min-width: 16;
+        height: 3;
+        margin-bottom: 0;
+        border: none;
+    }
+    #menu-hint {
+        height: auto;
+        color: $text-muted;
+        text-align: center;
+        margin-bottom: 1;
+    }
+    """
+
+    BINDINGS = [
+        Binding("left", "cursor_left", "Voce precedente", show=False),
+        Binding("right", "cursor_right", "Voce successiva", show=False),
+        Binding("up", "cursor_up", "Su", show=False),
+        Binding("down", "cursor_down", "Giu", show=False),
+        Binding("escape", "close_or_shrink", "Chiudi"),
+    ]
+
+    def __init__(
+        self,
+        categories: list[tuple[str, str, list[tuple[str, str, str, str | None]]]],
+    ) -> None:
+        super().__init__()
+        self.categories = categories
+        self._open_idx: int | None = None
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="menu-box"):
+            yield Label(T("menu_title"), id="menu-title")
+            with Horizontal(id="menu-bar"):
+                for i, (ct, ch, _items) in enumerate(self.categories):
+                    yield Button(ct, id=f"menu-cat-{i}", variant="default", tooltip=ch)
+            with Horizontal(id="menu-drop-row", classes="hidden"):
+                yield Static("", id="menu-drop-spacer")
+                with VerticalScroll(id="menu-drop", can_focus=False):
+                    for gi, (_ct, _ch, gitems) in enumerate(self.categories):
+                        with Vertical(
+                            id=f"menu-drop-{gi}", classes="menu-drop-group hidden"
+                        ):
+                            for gj, (t, h, _action, sc) in enumerate(gitems):
+                                label = f"{t} ({sc}) — {h}" if sc else f"{t} — {h}"
+                                yield Button(
+                                    label,
+                                    id=f"menu-item-{gi}-{gj}",
+                                    variant="default",
+                                )
+            yield Label(T("menu_hint"), id="menu-hint")
+            yield Button(T("ui_close_esc"), id="menu-close", variant="default")
+
+    def on_mount(self) -> None:
+        self._focus_cat(0)
+
+    # -- helpers ---------------------------------------------------------
+    def _cat_buttons(self) -> list[Button]:
+        return [
+            b
+            for b in self.query("#menu-bar Button")
+            if (b.id or "").startswith("menu-cat-")
+        ]
+
+    def _item_buttons(self) -> list[Button]:
+        if self._open_idx is None:
+            return []
+        try:
+            return list(self.query(f"#menu-drop-{self._open_idx} Button"))
+        except Exception:
+            return []
+
+    def _parse_item_id(self, fid: str) -> tuple[int, int] | None:
+        parts = (fid or "").split("-")
+        if len(parts) == 4 and parts[0] == "menu" and parts[1] == "item":
+            try:
+                return int(parts[2]), int(parts[3])
+            except ValueError:
+                return None
+        return None
+
+    def _focused_cat(self) -> int | None:
+        focused = self.focused
+        fid = getattr(focused, "id", "") or ""
+        if fid.startswith("menu-cat-"):
+            try:
+                return int(fid[len("menu-cat-") :])
+            except ValueError:
+                return None
+        return None
+
+    def _focused_item(self) -> tuple[int, int] | None:
+        parsed = self._parse_item_id(getattr(self.focused, "id", "") or "")
+        if parsed is None or self._open_idx is None or parsed[0] != self._open_idx:
+            return None
+        return parsed
+
+    def _focus_cat(self, i: int) -> None:
+        try:
+            self.query_one(f"#menu-cat-{i}", Button).focus()
+        except Exception:
+            pass
+
+    def _focus_item(self, i: int, j: int) -> None:
+        try:
+            self.query_one(f"#menu-item-{i}-{j}", Button).focus()
+        except Exception:
+            pass
+
+    def _set_active(self, i: int | None) -> None:
+        for k, b in enumerate(self._cat_buttons()):
+            try:
+                b.set_class(k == i, "active")
+            except Exception:
+                pass
+
+    def _drop_offset(self, i: int) -> int:
+        try:
+            btn = self.query_one(f"#menu-cat-{i}", Button)
+            row = self.query_one("#menu-drop-row", Horizontal)
+            off = int(btn.region.x - row.region.x) + 2
+            room = int(row.size.width) - self.DROP_W
+            return max(0, min(off, max(0, room)))
+        except Exception:
+            return min(i * 18 + 2, 20)
+
+    # -- apertura/chiusura dropdown --------------------------------------
+    def _open(self, i: int, focus_item: int = 0) -> None:
+        if not 0 <= i < len(self.categories):
+            return
+        self._open_idx = i
+        try:
+            for gi in range(len(self.categories)):
+                self.query_one(f"#menu-drop-{gi}").set_class(gi != i, "hidden")
+            self.query_one("#menu-drop-row", Horizontal).remove_class("hidden")
+        except Exception:
+            pass
+        self._set_active(i)
+
+        def _defer() -> None:
+            if self._open_idx != i:
+                return
+            try:
+                self.query_one(
+                    "#menu-drop-spacer", Static
+                ).styles.width = self._drop_offset(i)
+            except Exception:
+                pass
+            self._focus_item(i, focus_item)
+
+        try:
+            self.call_after_refresh(_defer)
+        except Exception:
+            _defer()
+
+    def _close_drop(self, focus_cat: bool = True) -> None:
+        idx = self._open_idx
+        self._open_idx = None
+        try:
+            self.query_one("#menu-drop-row", Horizontal).add_class("hidden")
+        except Exception:
+            pass
+        self._set_active(None)
+        if focus_cat:
+            self._focus_cat(idx if idx is not None else 0)
+
+    # -- eventi ----------------------------------------------------------
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id or ""
+        if bid == "menu-close":
+            self.dismiss(None)
+        elif bid.startswith("menu-cat-"):
+            try:
+                idx = int(bid[len("menu-cat-") :])
+            except ValueError:
+                return
+            if self._open_idx == idx:
+                self._close_drop()
+            else:
+                self._open(idx)
+        elif bid.startswith("menu-item-"):
+            if self._open_idx is None:
+                return
+            parsed = self._parse_item_id(bid)
+            if parsed is None or parsed[0] != self._open_idx:
+                return
+            try:
+                action = self.categories[parsed[0]][2][parsed[1]][2]
+            except IndexError:
+                return
+            self.dismiss(action)
+
+    # -- tastiera: frecce + esc ------------------------------------------
+    def action_cursor_left(self) -> None:
+        cur = self._focused_cat()
+        if cur is None:
+            cur = self._open_idx if self._open_idx is not None else 0
+        nxt = (cur - 1) % len(self.categories)
+        if self._open_idx is None:
+            self._focus_cat(nxt)
+        else:
+            self._open(nxt)
+
+    def action_cursor_right(self) -> None:
+        cur = self._focused_cat()
+        if cur is None:
+            cur = self._open_idx if self._open_idx is not None else 0
+        nxt = (cur + 1) % len(self.categories)
+        if self._open_idx is None:
+            self._focus_cat(nxt)
+        else:
+            self._open(nxt)
+
+    def action_cursor_down(self) -> None:
+        focused = self._focused_item()
+        if focused is not None:
+            items = self._item_buttons()
+            if items:
+                self._focus_item(focused[0], (focused[1] + 1) % len(items))
+            return
+        cat = self._focused_cat()
+        self._open(cat if cat is not None else 0)
+
+    def action_cursor_up(self) -> None:
+        focused = self._focused_item()
+        if focused is None:
+            return
+        if focused[1] <= 0:
+            self._focus_cat(focused[0])
+        else:
+            self._focus_item(focused[0], focused[1] - 1)
+
+    def action_close_or_shrink(self) -> None:
+        if self._open_idx is not None:
+            self._close_drop()
+        else:
+            self.dismiss(None)

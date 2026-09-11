@@ -28,7 +28,8 @@ mattina / resoconto sera (solo palette, zero rete).
 ```
 src/main.py      entry point + re-export compatibilità + init lingua PRIMA degli import
 src/app.py       TodoApp(App): orchestratore (~2400 righe, 125 metodi) — è la god-class nota
-src/screens.py   31 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback
+src/screens.py   32 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback;
+                 MenuScreen menubar (4 voci -> dropdown, dismiss = nome action)
 src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen;
                  sigilli #tag *progetto !prio ~stima //note, parse_with_found() per merge
 src/plan.py      plan_day() pura: score, capacita' ore/0.5 🍅, motivi (chiave, params)
@@ -39,9 +40,11 @@ src/storage.py   paths, load/save (todos/template/config/archive/pomodoro), lock
                  config include day_hours (default 6, clamp 1-16)
 src/crypto.py    Fernet + PBKDF2 (600k iter), chiave solo in RAM, envelope {"v","salt","data"}
 src/cli.py       add/list/done/show (add/done via TodoStore: lock+merge gratis); add senza flag = NL
-src/commands.py  TaskoMenuProvider (palette `m` / ctrl+p): voci senza tasto, tranne planner (`P`)
+src/commands.py  MENU_STRUCTURE (4 categorie: giornata/viste/dati/sistema, chiavi i18n +
+                 action + shortcut) + TaskoMenuProvider (palette `ctrl+p`, titoli
+                 "Categoria › Voce"); MENU_IT piatta tenuta per compatibilita'
 src/lang.py      catalogo STRINGS it/en + key_sections (help) — vedi §4
-tests/           ~104 test; conftest.py con fixture di isolamento (vedi §5)
+tests/           ~135 test; conftest.py con fixture di isolamento (vedi §5)
 ```
 
 Flusso dati standard nelle action: muta oggetti → `store` → `_save_data()` (= `store.commit()`)
@@ -77,7 +80,8 @@ Regole dure:
   (Windows Terminal/WSL) non lo consegnano all'app — `s` funziona ovunque (i campi di
   testo consumano i caratteri, quindi non scatta mentre digiti).
 - **Tasti globali**: superficie già ampia (~30 binding). Nuovi tasti solo su richiesta esplicita;
-  preferire palette/menu. Convenzione maiuscole = variante (`b/B`, `o/O`, `r` ricarica / `R` review;
+  preferire palette/menu. `m` = menu per funzioni (categorie -> voci),
+  `ctrl+p` = palette di ricerca. Convenzione maiuscole = variante (`b/B`, `o/O`, `r` ricarica / `R` review;
   eccezione approvata: `P` = piano smart, coppia di `p` = piano giorno).
 - **Nuove screen con lista scrollabile**: box ad altezza definita (`height: 90%`) + figlio
   flessibile (`height: 1fr`) — MAI box auto + `max-height` con figli auto (lezione stats:
@@ -149,6 +153,16 @@ Regole dure:
   mangiati dal markup nelle option — vedi §4.
 - **AI-5**: `BriefingScreen` mattina/sera (solo composizione dati esistenti, zero rete) da
   palette; `tests/test_briefing.py`. Stop-criterion manuale: lettura reale 5 giorni.
+- **Menu**: `m` = `MenuScreen` menubar (4 voci da `MENU_STRUCTURE` in
+  `commands.py`: click/Enter apre il dropdown sotto la voce, spostato a destra
+  via spacer; nuovo click = toggle; frecce + Enter da tastiera, esc chiude),
+  `ctrl+p` resta palette (`TaskoMenuProvider`, titoli "Categoria › Voce");
+  menu completo anche delle azioni con tasto; `tests/test_menu.py`.
+  Lezioni: gruppi dropdown pre-costruiti e commutati via classi (remove+mount
+  rapidi in sequenza danno `DuplicateIds`); offset/spacer e focus via
+  `call_after_refresh` con guardia su `_open_idx` (le region a riga nascosta
+  sono zero); dopo `remove_children`+`mount` il focus resta sul widget
+  rimosso — `set_focus(None)` + `call_after_refresh`.
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 
