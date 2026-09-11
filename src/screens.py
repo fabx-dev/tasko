@@ -2242,15 +2242,29 @@ class PlanProposalScreen(ModalScreen[None]):
     def _is_cut(reasons) -> bool:
         return any(k == "plan_cut" for k, _p in reasons)
 
+    @staticmethod
+    def _is_skipped(reasons) -> bool:
+        return any(k == "plan_skipped" for k, _p in reasons)
+
+    @classmethod
+    def _preselected(cls, reasons) -> bool:
+        return not cls._is_cut(reasons) and not cls._is_skipped(reasons)
+
     def _option_label(self, t_id: int, reasons) -> str:
         t = self.by_id.get(t_id)
         title = t.title if t else f"#{t_id}"
         due = _due_date_part(t.due) if t else ""
         extra = f" (scad. {due})" if due else ""
-        why = ", ".join(T(k, **p) for k, p in reasons if k != "plan_cut")
+        why = ", ".join(
+            T(k, **p) for k, p in reasons if k not in ("plan_cut", "plan_skipped")
+        )
         # Niente []: le option del SelectionList interpretano il markup Rich.
-        cut = f" ({T('plan_cut')})" if self._is_cut(reasons) else ""
-        return f"{title}{extra}  #{t_id} ({why}){cut}"
+        flags = "".join(
+            f" ({T(k)})"
+            for k in ("plan_cut", "plan_skipped")
+            if any(k == kk for kk, _p in reasons)
+        )
+        return f"{title}{extra}  #{t_id} ({why}){flags}"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="planp-box"):
@@ -2258,7 +2272,7 @@ class PlanProposalScreen(ModalScreen[None]):
                 f"[b]{T('planp_title', date=_format_date_it(self.today))}[/b]",
                 id="planp-title",
             )
-            n_in = sum(1 for _i, _s, r in self.plan if not self._is_cut(r))
+            n_in = sum(1 for _i, _s, r in self.plan if self._preselected(r))
             yield Static(
                 T("planp_summary", n=n_in, c=len(self.plan) - n_in, h=int(self.hours)),
                 id="planp-summary",
@@ -2269,7 +2283,7 @@ class PlanProposalScreen(ModalScreen[None]):
                         (
                             self._option_label(t_id, reasons),
                             t_id,
-                            not self._is_cut(reasons),
+                            self._preselected(reasons),
                         )
                         for t_id, _score, reasons in self.plan
                     ],
@@ -2317,9 +2331,12 @@ class PlanProposalScreen(ModalScreen[None]):
                 continue
             if t.id in selected:
                 t.planned_for = self.today
+                t.plan_skip = ""
                 n += 1
-            elif t.planned_for == self.today:
-                t.planned_for = ""
+            else:
+                if t.planned_for == self.today:
+                    t.planned_for = ""
+                t.plan_skip = self.today
         self.on_change()
         self.notify(T("n_planp_saved", n=n))
         self.dismiss()
@@ -2454,7 +2471,7 @@ class BriefingScreen(ModalScreen[None]):
             for t_id, _s, reasons in plan_day(
                 active, today=self.today, hours=self.hours
             )
-            if not any(k == "plan_cut" for k, _p in reasons)
+            if not any(k in ("plan_cut", "plan_skipped") for k, _p in reasons)
         ][:5]
         if top:
             lines.append(T("brief_m_top"))

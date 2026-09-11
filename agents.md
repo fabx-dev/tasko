@@ -31,7 +31,8 @@ src/app.py       TodoApp(App): orchestratore (~2400 righe, 125 metodi) — è la
 src/screens.py   30 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback
 src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen
 src/plan.py      plan_day() pura: score, capacita' ore/0.5 🍅, motivi (chiave, params)
-src/models.py    TodoItem, Priority, Recurrence, validazioni date, MAX_DEPTH=6
+src/models.py    TodoItem, Priority, Recurrence, validazioni date, MAX_DEPTH=6;
+                 campi extra: stima_pomo, planned_for, plan_skip (scarto piano smart, data)
 src/store.py     TodoStore: lookup id, mutazioni, next_id, commit() = UNICO punto di scrittura todos
 src/storage.py   paths, load/save (todos/template/config/archive/pomodoro), lock, merge, backup;
                  config include day_hours (default 6, clamp 1-16)

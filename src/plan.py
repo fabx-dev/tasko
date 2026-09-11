@@ -13,7 +13,9 @@ Regole (pesi = costanti in testa al modulo, ritoccabili senza refactor):
 - capacita': ore / POMO_HOURS pomodori; stima mancante = DEFAULT_ESTIMATE.
   Scaduti e di oggi non si tagliano mai (possono sforare); gli altri riempiono
   greedy per score; gli esclusi hanno reason ("plan_cut", {}).
-- ordinamento: inclusi per score desc (a pari: due, id), poi i tagliati.
+- scartati oggi (plan_skip == today): in fondo con reason ("plan_skipped", {}),
+  mai preselezionati, fuori dal consumo di capacita'; domani si ripropongono.
+- ordinamento: inclusi per score desc (a pari: due, id), poi tagliati, poi scartati.
 """
 
 from datetime import datetime
@@ -115,9 +117,12 @@ def plan_day(todos: list, today: str | None = None, hours: float = 6.0) -> list:
         scored.append((t, score, reasons, mandatory))
     included: list[tuple] = []
     rest: list[tuple] = []
+    skipped: list[tuple] = []
     used = 0
     for t, score, reasons, mandatory in scored:
-        if mandatory or t.planned_for == today_s:
+        if getattr(t, "plan_skip", "") == today_s:
+            skipped.append((t, score, [*reasons, ("plan_skipped", {})]))
+        elif mandatory or t.planned_for == today_s:
             included.append((t, score, reasons))
             used += _estimate(t)
         else:
@@ -129,6 +134,7 @@ def plan_day(todos: list, today: str | None = None, hours: float = 6.0) -> list:
             used += _estimate(t)
         else:
             included.append((t, score, [*reasons, ("plan_cut", {})]))
+    skipped.sort(key=lambda e: (-e[1], _due_date_part(e[0].due) or "9999", e[0].id))
     included.sort(
         key=lambda e: (
             any(k == "plan_cut" for k, _p in e[2]),
@@ -137,4 +143,4 @@ def plan_day(todos: list, today: str | None = None, hours: float = 6.0) -> list:
             e[0].id,
         )
     )
-    return [(t.id, score, reasons) for t, score, reasons in included]
+    return [(t.id, score, reasons) for t, score, reasons in [*included, *skipped]]

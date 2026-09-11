@@ -166,6 +166,7 @@ class TodoItem:
         pomodoros: int = 0,
         pomodoro_log: list[str] | None = None,
         stima_pomo: int = 0,
+        plan_skip: str = "",
     ):
         self.id = todo_id
         self.title = title
@@ -189,6 +190,9 @@ class TodoItem:
             self.stima_pomo = max(0, int(stima_pomo or 0))
         except (ValueError, TypeError):
             self.stima_pomo = 0
+        # Giorno YYYY-MM-DD in cui il task e' stato scartato dal piano smart
+        # (proposta successiva lo mostra deselezionato; si azzera al cambio giorno).
+        self.plan_skip = str(plan_skip or "")
         # Log timestamp dei pomodori completati ("YYYY-MM-DD HH:MM"), per i trend.
         # I task vecchi non ce l'hanno: resta [] e il totale resta in pomodoros.
         if isinstance(pomodoro_log, list):
@@ -229,6 +233,7 @@ class TodoItem:
             "pomodoros": self.pomodoros,
             "pomodoro_log": self.pomodoro_log,
             "stima_pomo": self.stima_pomo,
+            "plan_skip": self.plan_skip,
         }
 
     @classmethod
@@ -279,6 +284,7 @@ class TodoItem:
             pomodoros=data.get("pomodoros", 0),
             pomodoro_log=data.get("pomodoro_log", []),
             stima_pomo=data.get("stima_pomo", 0),
+            plan_skip=str(data.get("plan_skip", "") or ""),
         )
 
 

@@ -134,3 +134,34 @@ def test_vuoto_e_determinismo():
     first = plan_day(todos, TODAY)
     assert _ids(first) == [1, 2]  # pari score -> id
     assert plan_day(todos, TODAY) == first
+
+
+def test_scartati_oggi_in_fondo_senza_capacita():
+    todos = [
+        make_todo("A", todo_id=1, due=TODAY),
+        make_todo("S-skip", todo_id=2, due=TODAY, stima_pomo=50, plan_skip=TODAY),
+        make_todo("B", todo_id=3, due="2026-09-11"),
+    ]
+    plan = plan_day(todos, TODAY, hours=1.0)
+    assert _ids(plan)[-1] == 2
+    assert ("plan_skipped", {}) in [r for i, _s, rs in plan for r in rs if i == 2]
+    # lo scartato (stima enorme) non consuma capacita': B entra comunque
+    assert "plan_cut" not in _reasons(plan, 3)
+
+
+def test_skip_vecchio_riproposto():
+    todos = [make_todo("S", todo_id=1, due=TODAY, plan_skip="2026-09-09")]
+    plan = plan_day(todos, TODAY)
+    assert len(plan) == 1
+    _pid, _score, reasons = plan[0]
+    assert all(k != "plan_skipped" for k, _p in reasons)
+
+
+def test_roundtrip_plan_skip():
+    from src.models import TodoItem
+
+    t = make_todo("X", todo_id=1, plan_skip=TODAY)
+    assert TodoItem.from_dict(t.to_dict()).plan_skip == TODAY
+    t2 = make_todo("Y", todo_id=2)
+    assert t2.plan_skip == ""
+    assert TodoItem.from_dict(t2.to_dict()).plan_skip == ""

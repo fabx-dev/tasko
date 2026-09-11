@@ -422,6 +422,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "plan_stale": "progetto fermo da {n}g",
         "plan_planned": "già in piano",
         "plan_cut": "fuori dalle ore",
+        "plan_skipped": "scartato oggi",
         # Chiusura giornata
         "rev_title": "Chiusura giornata — {date}",
         "rev_summary": "Oggi: [b]{done}[/] completati{goal} · [red]🍅 {pomo}[/] pomodori",
@@ -450,7 +451,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "brief_e_left_empty": "[green]Piano svuotato. Ottimo lavoro.[/]",
         "brief_e_hint": " [dim]R per la chiusura giornata[/]",
         "planp_title": "Piano smart — {date}",
-        "planp_summary": "{n} proposti · {c} fuori dalle ore ({h}h)",
+        "planp_summary": "{n} proposti · {c} esclusi ({h}h)",
         "planp_empty": "[green]Niente da pianificare: nessun task attivo.[/]",
         "n_planp_saved": "Piano di oggi: {n} task.",
         "goals_title": "[b]Obiettivi[/b]",
@@ -930,6 +931,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "plan_stale": "project stalled for {n}d",
         "plan_planned": "already planned",
         "plan_cut": "over capacity",
+        "plan_skipped": "dismissed today",
         # Day closing
         "rev_title": "Day closing — {date}",
         "rev_summary": "Today: [b]{done}[/] done{goal} · [red]🍅 {pomo}[/] pomodoros",
@@ -958,7 +960,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "brief_e_left_empty": "[green]Plan cleared. Great work.[/]",
         "brief_e_hint": " [dim]R for day closing[/]",
         "planp_title": "Smart plan — {date}",
-        "planp_summary": "{n} proposed · {c} over capacity ({h}h)",
+        "planp_summary": "{n} proposed · {c} excluded ({h}h)",
         "planp_empty": "[green]Nothing to plan: no active tasks.[/]",
         "n_planp_saved": "Today plan: {n} tasks.",
         # Goals

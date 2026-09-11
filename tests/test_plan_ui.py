@@ -74,6 +74,47 @@ def test_tagliati_non_preselezionati(tmp_files):
     asyncio.run(t())
 
 
+def test_rientro_ricorda_scarti(tmp_files):
+    """Deseleziona -> conferma -> rientra: resta deselezionato con motivo;
+    riseleziona -> skip azzerato e ripianificato."""
+    from src.lang import T as _T
+
+    async def t():
+        app = make_app(_todos())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            opts = app.screen.query_one("#planp-list", SelectionList)
+            assert set(opts.selected) == {1, 2, 3}
+            opts.deselect(3)
+            await pilot.press("ctrl+enter")
+            await pilot.pause()
+            await pilot.pause()
+            by_id = {t.id: t for t in app.todos}
+            assert by_id[3].planned_for == ""
+            assert by_id[3].plan_skip == _day(0)
+            # rientro: C deselezionato con motivo, gli altri selezionati
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            opts = app.screen.query_one("#planp-list", SelectionList)
+            assert set(opts.selected) == {1, 2}
+            labels = " ".join(str(o.prompt) for o in opts._options)
+            assert _T("plan_skipped") in labels
+            # riseleziona C: skip azzerato
+            opts.select(3)
+            await pilot.press("ctrl+enter")
+            await pilot.pause()
+            await pilot.pause()
+            by_id = {t.id: t for t in app.todos}
+            assert by_id[3].planned_for == _day(0)
+            assert by_id[3].plan_skip == ""
+
+    asyncio.run(t())
+
+
 def test_menu_palette_e_settings_ore(tmp_files):
     names = [action for _t, _h, action in commands_module.TaskoMenuProvider.MENU_IT]
     assert "action_plan_day" in names
