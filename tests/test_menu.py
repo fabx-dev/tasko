@@ -137,17 +137,14 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             await _open_menu(pilot, app)
-            # sinistra: solo le 4 voci; destra: segnaposto, nessun sottomenu
-            assert _open_idx(app.screen) is None
-            assert T("menu_pick") in screen_texts(app.screen)
-            # click apre il sottomenu a destra
-            await pilot.click("#menu-cat-0")
-            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
+            # sinistra: solo le 4 voci; destra: primo sottomenu gia' aperto
+            assert _open_idx(app.screen) == 0
             assert len(_visible_rows(app.screen, 0)) >= 5
-            assert T("menu_review_t") in screen_texts(app.screen)
+            assert T("menu_review_t") in _visible_texts(app.screen)
+            assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
             # marcatore voce aperta + contatore
             assert "›" in screen_texts(app.screen)
-            # nuovo click sulla stessa voce lo chiude (toggle)
+            # click sulla voce aperta lo chiude (toggle), click su altra apre
             await pilot.click("#menu-cat-0")
             assert await _wait_for(pilot, lambda: _open_idx(app.screen) is None)
             assert len(_bar_cats(app.screen)) == 4
@@ -176,7 +173,6 @@ def test_tasto_chiudi_con_click(tmp_files):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             await _open_menu(pilot, app)
-            await pilot.click("#menu-cat-0")
             assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
             await pilot.click("#menu-close")
             assert await _wait_for(
@@ -218,6 +214,7 @@ def test_frecce_ed_enter_da_tastiera(tmp_files):
             await pilot.pause()
             await _open_menu(pilot, app)
             assert getattr(app.screen.focused, "id", None) == "menu-cat-0"
+            assert _open_idx(app.screen) == 0
             # giu/su scorrono le voci con anteprima del sottomenu a destra
             await pilot.press("down")
             await pilot.pause()
@@ -313,7 +310,6 @@ def test_righe_compatte_su_due_righe(tmp_files):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             await _open_menu(pilot, app)
-            await pilot.click("#menu-cat-0")
             assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
             row = app.screen.query_one("#menu-item-0-0")
             assert row.region.height == 2, row.region
@@ -377,14 +373,19 @@ def test_filtro_backspace_esc_e_nessun_risultato(tmp_files):
             await pilot.press("backspace")
             await pilot.pause()
             assert app.screen._filter == "zz"
-            # esc svuota il filtro ma resta nel menu
+            # esc svuota il filtro ma resta nel menu (torna al gruppo aperto)
             await pilot.press("escape")
             await pilot.pause()
             await pilot.pause()
             assert type(app.screen).__name__ == "MenuScreen"
             assert app.screen._filter == ""
-            assert T("menu_pick") in screen_texts(app.screen)
-            # esc chiude il menu
+            assert T("menu_review_t") in screen_texts(app.screen)
+            # esc chiude il sottomenu, poi il menu
+            await pilot.press("escape")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "MenuScreen"
+            assert _open_idx(app.screen) is None
             await pilot.press("escape")
             await pilot.pause()
             await pilot.pause()

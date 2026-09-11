@@ -4227,9 +4227,9 @@ class MenuScreen(ModalScreen[str | None]):
 
     CSS = """
     #menu-box {
-        width: 84;
+        width: 80;
         max-width: 94%;
-        height: 28;
+        height: 30;
         max-height: 90%;
     }
     #menu-title {
@@ -4339,7 +4339,7 @@ class MenuScreen(ModalScreen[str | None]):
 
     def on_mount(self) -> None:
         self._refresh_texts()
-        self._apply_filter()
+        self._open(0, focus_item=None)
         self._focus_cat(0)
 
     # -- helpers ---------------------------------------------------------
