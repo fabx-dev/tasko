@@ -261,6 +261,23 @@ def test_placeholder_rotante(tmp_files):
     asyncio.run(t())
 
 
+def test_striscia_non_troncata(tmp_files):
+    """La striscia sintassi va a capo (width 1fr), niente clipping orizzontale."""
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            w = app.screen.query_one("#nl-syntax", Label)
+            assert w.region.height >= 2
+            assert w.scrollable_content_region.width <= w.region.width
+
+    asyncio.run(t())
+
+
 def _cli(args, home):
     env = dict(os.environ, TASKO_HOME=str(home))
     return subprocess.run(

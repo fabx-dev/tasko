@@ -91,10 +91,12 @@ class TodoFormScreen(ModalScreen[dict | None]):
         padding: 0 1;
     }
     #nl-preview {
+        width: 1fr;
         height: auto;
         margin-bottom: 1;
     }
     #nl-syntax {
+        width: 1fr;
         height: auto;
         margin-bottom: 0;
     }
