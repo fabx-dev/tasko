@@ -789,6 +789,7 @@ class WeekScreen(ModalScreen[None]):
     #week-box {
         width: 80;
         max-width: 95%;
+        height: 90%;
         max-height: 90%;
     }
     #week-title {
@@ -809,8 +810,7 @@ class WeekScreen(ModalScreen[None]):
         margin: 0 1;
     }
     #week-list {
-        height: auto;
-        max-height: 22;
+        height: 1fr;
         margin-bottom: 1;
     }
     """

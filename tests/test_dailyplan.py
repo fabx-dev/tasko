@@ -139,3 +139,31 @@ def test_layout_basso(tmp_files):
             assert btn.y >= box.y and btn.y + btn.height <= box.y + box.height
 
     asyncio.run(t())
+
+
+def test_week_layout_terminale_piccolo(tmp_files):
+    """La cornice settimana contiene lista + Chiudi a terminale piccolo."""
+
+    async def t():
+        todos = [make_todo(f"T{i}", todo_id=i, due=_day(i % 7)) for i in range(1, 20)]
+        for size in ((120, 40), (80, 24)):
+            app = make_app(todos)
+            async with app.run_test(size=size) as pilot:
+                await pilot.pause()
+                app.action_view_week()
+                await pilot.pause()
+                await pilot.pause()
+                assert type(app.screen).__name__ == "WeekScreen"
+                box = app.screen.query_one("#week-box").region
+                btn = app.screen.query_one("#week-close").region
+                lst = app.screen.query_one("#week-list").region
+                for name, reg in (("close", btn), ("list", lst)):
+                    assert reg.y >= box.y, (size, name, reg, box)
+                    assert reg.y + reg.height <= box.y + box.height, (
+                        size,
+                        name,
+                        reg,
+                        box,
+                    )
+
+    asyncio.run(t())
