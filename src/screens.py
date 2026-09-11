@@ -4229,7 +4229,7 @@ class MenuScreen(ModalScreen[str | None]):
     #menu-box {
         width: 84;
         max-width: 94%;
-        height: 90%;
+        height: 28;
         max-height: 90%;
     }
     #menu-title {
@@ -4252,9 +4252,8 @@ class MenuScreen(ModalScreen[str | None]):
     #menu-bar {
         width: 24;
         height: 100%;
+        margin-top: 1;
         margin-right: 1;
-        border: solid $primary;
-        background: $surface;
     }
     #menu-bar MenuRow {
         width: 100%;
@@ -4548,6 +4547,10 @@ class MenuScreen(ModalScreen[str | None]):
         self.dismiss(action)
 
     # -- eventi ----------------------------------------------------------
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if (event.button.id or "") == "menu-close":
+            self.dismiss(None)
+
     def menu_row_clicked(self, bid: str) -> None:
         if bid.startswith("menu-cat-"):
             try:

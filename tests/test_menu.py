@@ -170,6 +170,22 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
     run(t())
 
 
+def test_tasto_chiudi_con_click(tmp_files):
+    async def t():
+        app = make_app([make_todo("A")])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await _open_menu(pilot, app)
+            await pilot.click("#menu-cat-0")
+            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
+            await pilot.click("#menu-close")
+            assert await _wait_for(
+                pilot, lambda: type(app.screen).__name__ != "MenuScreen"
+            )
+
+    run(t())
+
+
 def test_scelta_voce_con_click(tmp_files):
     async def t():
         app = make_app([make_todo("A")])
