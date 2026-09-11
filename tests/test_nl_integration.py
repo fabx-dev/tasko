@@ -74,7 +74,7 @@ def test_form_salva_con_s(tmp_files):
     asyncio.run(t())
 
 
-def test_form_ctrl_l_titolo_vuoto(tmp_files):
+def test_form_ctrl_l_titolo_vuoto_apre_aiuto(tmp_files):
     async def t():
         app = make_app([])
         async with app.run_test(size=(120, 40)) as pilot:
@@ -84,7 +84,96 @@ def test_form_ctrl_l_titolo_vuoto(tmp_files):
             await pilot.pause()
             await pilot.press("ctrl+l")
             await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "NLHelpScreen"
+            await pilot.press("escape")
+            await pilot.pause()
             assert type(app.screen).__name__ == "TodoFormScreen"
+
+    asyncio.run(t())
+
+
+def test_form_ctrl_l_merge_non_overwrite(tmp_files):
+    """Campi digitati a mano sopravvivono al fill (solo trovati compilati)."""
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            scr = app.screen
+            scr.query_one("#project-input", Input).value = "casa"
+            scr.query_one("#title-input", Input).value = "call domani"
+            await pilot.press("ctrl+l")
+            await pilot.pause()
+            from datetime import datetime, timedelta
+
+            domani = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+            assert scr.query_one("#title-input", Input).value == "call"
+            assert scr.query_one("#due-input", Input).value == domani
+            assert scr.query_one("#project-input", Input).value == "casa"
+            # secondo ctrl+l: idempotente, niente reset
+            await pilot.press("ctrl+l")
+            await pilot.pause()
+            assert scr.query_one("#due-input", Input).value == domani
+            assert scr.query_one("#project-input", Input).value == "casa"
+            from src.models import Priority as _P
+
+            assert scr.query_one("#priority-select", Select).value == _P.MEDIUM
+
+    asyncio.run(t())
+
+
+def test_form_ctrl_l_focus_e_note(tmp_files):
+    """Dopo il fill il focus va su Salva (s non corrompe il titolo); // in nota."""
+    from textual.widgets import TextArea
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            scr = app.screen
+            scr.query_one("#title-input", Input).value = "call domani // portare doc"
+            await pilot.press("ctrl+l")
+            await pilot.pause()
+            assert scr.query_one("#notes-textarea", TextArea).text == "portare doc"
+            assert scr.focused is scr.query_one("#save-btn")
+            await pilot.press("s")
+            await pilot.pause()
+            await pilot.pause()
+            assert len(app.todos) == 1
+            assert app.todos[0].title == "call"
+            assert app.todos[0].notes == "portare doc"
+
+    asyncio.run(t())
+
+
+def test_form_anteprima_live(tmp_files):
+    """Digitare aggiorna la preview senza compilare i campi."""
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_new_todo()
+            await pilot.pause()
+            await pilot.pause()
+            scr = app.screen
+            scr.query_one("#title-input", Input).value = "call domani #casa"
+            await pilot.pause()
+            preview = str(scr.query_one("#nl-preview", Label).render())
+            assert "#casa" in preview
+            assert scr.query_one("#due-input", Input).value == ""  # non compilato
+            scr.query_one("#title-input", Input).value = "Solo titolo"
+            await pilot.pause()
+            from src.lang import T as _T
+
+            assert _T("nl_hint") in str(scr.query_one("#nl-preview", Label).render())
 
     asyncio.run(t())
 

@@ -47,7 +47,7 @@ from src.models import (
     _pomo_label,
     _status,
 )
-from src.nlparse import parse
+from src.nlparse import parse_with_found
 from src.plan import plan_day
 from src.storage import _backup_sources, snapshot_info
 
@@ -240,24 +240,60 @@ class TodoFormScreen(ModalScreen[dict | None]):
         self._submit()
 
     def action_fill_nl(self) -> None:
-        """Compila i campi dal titolo in linguaggio naturale (ctrl+l)."""
+        """Compila SOLO i campi trovati nel titolo (ctrl+l); mai overwrite.
+
+        A titolo vuoto apre il foglio esempi invece di lamentarsi.
+        """
         raw = self.query_one("#title-input", Input).value.strip()
         if not raw:
-            self.notify(T("n_title_req"), severity="warning")
+            # Niente import di app (convenzione): self.app e' runtime Textual.
+            self.app.push_screen(NLHelpScreen())
             return
-        res = parse(raw, get_lang())
+        res, found = parse_with_found(raw, get_lang())
+        # Firma anti-eco: il Changed asincrono del set programmatico viene ignorato.
+        self._nl_filled = res["title"]
         self.query_one("#title-input", Input).value = res["title"]
-        self.query_one("#due-input", Input).value = res["due"]
-        self.query_one("#project-input", Input).value = res["project"]
-        self.query_one("#tags-input", Input).value = ", ".join(res["tags"])
-        stima = int(res["stima_pomo"] or 0)
-        self.query_one("#stima-input", Input).value = str(stima) if stima else ""
-        self.query_one("#priority-select", Select).value = res["priority"]
-        self.query_one("#recurrence-select", Select).value = res["recurrence"]
-        self.query_one("#nl-preview", Label).update(self._nl_summary(res))
+        if "due" in found:
+            self.query_one("#due-input", Input).value = res["due"]
+        if "project" in found:
+            self.query_one("#project-input", Input).value = res["project"]
+        if "tags" in found:
+            self.query_one("#tags-input", Input).value = ", ".join(res["tags"])
+        if "stima_pomo" in found:
+            stima = int(res["stima_pomo"] or 0)
+            self.query_one("#stima-input", Input).value = str(stima) if stima else ""
+        if "priority" in found:
+            self.query_one("#priority-select", Select).value = res["priority"]
+        if "recurrence" in found:
+            self.query_one("#recurrence-select", Select).value = res["recurrence"]
+        if "notes" in found:
+            self.query_one("#notes-textarea", TextArea).text = res["notes"]
+        self.query_one("#nl-preview", Label).update(self._nl_summary(res, found))
+        try:
+            self.query_one("#save-btn", Button).focus()
+        except Exception:
+            pass
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Anteprima live mentre digiti il titolo (compila solo con ctrl+l)."""
+        try:
+            if event.input.id != "title-input":
+                return
+            if event.value == getattr(self, "_nl_filled", None):
+                return  # eco del fill programmatico: preview gia' impostata
+            self._nl_filled = None
+            res, found = parse_with_found(event.value, get_lang())
+            if len(found) > 1:
+                self.query_one("#nl-preview", Label).update(
+                    self._nl_summary(res, found)
+                )
+            else:
+                self.query_one("#nl-preview", Label).update(f"[dim]{T('nl_hint')}[/]")
+        except Exception:
+            pass
 
     @staticmethod
-    def _nl_summary(res: dict) -> str:
+    def _nl_summary(res: dict, found: set | None = None) -> str:
         parts = []
         if res["due"]:
             parts.append(res["due"])
@@ -270,6 +306,8 @@ class TodoFormScreen(ModalScreen[dict | None]):
             parts.append(rec_disp(res["recurrence"].value))
         if int(res["stima_pomo"] or 0):
             parts.append(f"~{res['stima_pomo']}")
+        if res["notes"]:
+            parts.append("// …")
         if not parts:
             return f"[dim]{T('nl_none')}[/]"
         return T("nl_preview", s=" · ".join(parts))
@@ -327,6 +365,64 @@ class TodoFormScreen(ModalScreen[dict | None]):
                 "stima_pomo": stima,
             }
         )
+
+
+class NLHelpScreen(ModalScreen[None]):
+    """Foglio esempi per l'inserimento in linguaggio naturale."""
+
+    CSS = """
+    #nlh-box {
+        width: 72;
+        max-width: 95%;
+        height: auto;
+        max-height: 90%;
+    }
+    #nlh-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+        height: auto;
+    }
+    .nlh-line {
+        height: auto;
+        margin-bottom: 0;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "close", "Chiudi")]
+
+    ROWS = (
+        "nl_h_due",
+        "nl_h_proj",
+        "nl_h_tags",
+        "nl_h_prio",
+        "nl_h_est",
+        "nl_h_rec",
+        "nl_h_notes",
+    )
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="nlh-box"):
+            yield Label(f"[b]{T('nl_help_t')}[/b]", id="nlh-title")
+            for key in self.ROWS:
+                yield Label(f"  {T(key)}", classes="nlh-line")
+            yield Label(f"  [dim]{T('nl_ex1')}[/]", classes="nlh-line")
+            yield Label(f"  [dim]{T('nl_ex2')}[/]", classes="nlh-line")
+            yield Button(T("ui_close_esc"), id="nlh-close", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#nlh-close", Button).focus()
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "nlh-close":
+            self.dismiss()
+
+    def action_close(self) -> None:
+        self.dismiss()
 
 
 class ConfirmScreen(ModalScreen[bool]):

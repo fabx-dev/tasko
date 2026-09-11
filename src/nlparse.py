@@ -6,7 +6,7 @@ project, stima_pomo.
 
 Sintassi (entrambe le lingue, parole chiave selezionate da `lang`):
     domani alle 17 / #tag / *progetto / !alta|!1 / ~4 / ogni lunedi /
-    tra 3 giorni / 15/09 / 2026-09-15 09:30
+    tra 3 giorni / 15/09 / 2026-09-15 09:30 / // nota (resto della riga)
 
 Ambiguità fissate (coperte da test, non negoziabili senza aggiornarli):
 - giorno settimanale nudo ("lunedi") = primo tale giorno STRETTAMENTE futuro
@@ -20,8 +20,11 @@ Ambiguità fissate (coperte da test, non negoziabili senza aggiornarli):
   occorrenza nel testo; i tag si uniscono (deduplicati, ordine conservato).
 - token non riconosciuti ("!xyz", "*", "#" soli, date impossibili come 29/02/2026
   negli anni non bisestili) restano nel titolo.
+- "// nota": solo se a inizio riga o dopo spazio (gli URL tipo https://... restano
+  intatti); tutto cio' che segue va in notes, i token al suo interno NON si parsano.
 - `lang` sconosciuto o mancante -> "it".
 - title puo' risultare "": la validazione resta al form (n_title_req).
+- parse_with_found() ritorna anche i campi trovati (per merge nel form, non overwrite).
 """
 
 import re
@@ -225,6 +228,14 @@ def _compile(lang: str):
 
 def parse(text: str, lang: str = "it") -> dict:
     """Estrae i campi task da una frase in linguaggio naturale."""
+    return parse_with_found(text, lang)[0]
+
+
+def parse_with_found(text: str, lang: str = "it") -> tuple[dict, set[str]]:
+    """Come parse(), piu' l'insieme dei campi trovati (nomi del result).
+
+    "title" e' sempre presente (e' la fonte); "due" vale per data e/o ora.
+    """
     lang = (lang or "it").lower()[:2]
     if lang not in ("it", "en"):
         lang = "it"
@@ -240,7 +251,15 @@ def parse(text: str, lang: str = "it") -> dict:
         "project": "",
         "stima_pomo": 0,
     }
+    found = {"title"}
     s = text or ""
+    # Nota // per prima: il resto della riga non si parsa (solo se a inizio
+    # riga o dopo spazio, cosi' gli URL restano intatti).
+    nm = re.search(r"(?:^|\s)// ?", s)
+    if nm:
+        out["notes"] = s[nm.end() :].strip()
+        found.add("notes")
+        s = s[: nm.start()].rstrip()
     # Tutti i match sul testo originale: posizioni confrontabili, vince l'ultima.
     events: list[tuple[int, int, str, object]] = []  # (start, end, kind, value)
     for kind, (pattern, resolve) in _compile(lang).items():
@@ -289,6 +308,8 @@ def parse(text: str, lang: str = "it") -> dict:
         if t not in tags:
             tags.append(str(t))
     out["tags"] = tags
+    if by_kind.get("tag"):
+        found.add("tags")
     for kind, key in (
         ("stima", "stima_pomo"),
         ("priority", "priority"),
@@ -297,10 +318,12 @@ def parse(text: str, lang: str = "it") -> dict:
     ):
         if by_kind.get(kind):
             out[key] = by_kind[kind][-1]
+            found.add(key)
     time = by_kind.get("time", [])
     time_str = str(time[-1]) if time else ""
     dates = by_kind.get("date", [])
     if dates or time_str:
+        found.add("due")
         day = dates[-1] if dates else today
         due = day.isoformat() if hasattr(day, "isoformat") else ""
         if due and time_str:
@@ -309,4 +332,4 @@ def parse(text: str, lang: str = "it") -> dict:
     title = re.sub(r"\s+", " ", s).strip()
     title = re.sub(r"[\s,;:.]+$", "", title).strip()
     out["title"] = title
-    return out
+    return out, found

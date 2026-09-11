@@ -28,8 +28,9 @@ mattina / resoconto sera (solo palette, zero rete).
 ```
 src/main.py      entry point + re-export compatibilità + init lingua PRIMA degli import
 src/app.py       TodoApp(App): orchestratore (~2400 righe, 125 metodi) — è la god-class nota
-src/screens.py   30 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback
-src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen
+src/screens.py   31 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback
+src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen;
+                 sigilli #tag *progetto !prio ~stima //note, parse_with_found() per merge
 src/plan.py      plan_day() pura: score, capacita' ore/0.5 🍅, motivi (chiave, params)
 src/models.py    TodoItem, Priority, Recurrence, validazioni date, MAX_DEPTH=6;
                  campi extra: stima_pomo, planned_for, plan_skip (scarto piano smart, data)

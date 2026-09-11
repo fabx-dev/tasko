@@ -224,3 +224,41 @@ def test_enum_e_due_valido():
     assert res["tags"] == ["t"]
     assert res["stima_pomo"] == 2
     assert res["notes"] == ""
+
+
+def test_note_doppio_slash(tmp_files):
+    res = parse("call domani // portare documenti #veri", "it")
+    assert res["title"] == "call"
+    assert res["due"] == _today(1)
+    assert res["notes"] == "portare documenti #veri"
+    assert res["tags"] == []
+    res = parse("// solo nota", "it")
+    assert res["title"] == ""
+    assert res["notes"] == "solo nota"
+    res = parse("meeting tomorrow // bring slides", "en")
+    assert res["title"] == "meeting"
+    assert res["due"] == _today(1)
+    assert res["notes"] == "bring slides"
+
+
+def test_doppio_slash_non_in_url():
+    res = parse("leggi https://esempio.it/x domani", "it")
+    assert res["notes"] == ""
+    assert res["title"] == "leggi https://esempio.it/x"
+    assert res["due"] == _today(1)
+    res = parse("x//y domani", "it")
+    assert res["title"] == "x//y"
+    assert res["due"] == _today(1)
+
+
+def test_parse_with_found():
+    from src.nlparse import parse_with_found
+
+    res, found = parse_with_found("call domani *p", "it")
+    assert found == {"title", "due", "project"}
+    assert res["title"] == "call"
+    res, found = parse_with_found("Solo titolo", "it")
+    assert found == {"title"}
+    res, found = parse_with_found("x #a ~2 // nota", "it")
+    assert found == {"title", "tags", "stima_pomo", "notes"}
+    assert res["notes"] == "nota"
