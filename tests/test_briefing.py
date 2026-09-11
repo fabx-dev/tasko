@@ -36,10 +36,17 @@ def test_mattina(tmp_files):
             await pilot.pause()
             assert type(app.screen).__name__ == "BriefingScreen"
             txt = screen_texts(app.screen)
-            assert T("brief_m_today", p=1, d=1, o=1) in txt
+            from src.screens import BriefingScreen as _B
+
+            assert T("brief_m_sec_today") in txt
+            assert _B._hero(T("brief_k_plan"), "1") in txt
+            assert _B._hero(T("brief_k_due"), "1") in txt
+            assert _B._hero(T("brief_k_over"), "1") in txt
             assert T("brief_m_load", s=2, c=12, h=6) in txt
             assert T("brief_m_yest", d=1, p=1) in txt
             assert "O-ieri" in txt  # top proposta
+            assert T("plan_overdue") in txt  # motivo su riga propria
+            assert "()" not in txt  # niente parentesi vuote
             assert T("stats_serie", n=1) in txt
 
     asyncio.run(t())
@@ -65,8 +72,11 @@ def test_sera(tmp_files):
             await pilot.pause()
             assert type(app.screen).__name__ == "BriefingScreen"
             txt = screen_texts(app.screen)
-            assert T("brief_e_done", d=2, g=5, p=1) in txt
+            assert T("brief_e_sec_done") in txt
+            assert "2/5 · 1 🍅  ████░░░░░░" in txt  # barra obiettivo
+            assert T("brief_e_sec_left") in txt
             assert "P-piano" in txt  # rimasto in piano
+            assert "#1" not in txt  # niente id interni
             assert T("brief_e_hint") in txt
 
     asyncio.run(t())

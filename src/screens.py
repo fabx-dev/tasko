@@ -2612,6 +2612,12 @@ class BriefingScreen(ModalScreen[None]):
         except ValueError:
             return self.today
 
+    @staticmethod
+    def _hero(label: str, value: str) -> str:
+        """Riga statistica allineata: label puntinata a larghezza fissa."""
+        dots = "." * max(2, 16 - len(label))
+        return f"  {label} {dots} {value}"
+
     def _morning_lines(self) -> list[str]:
         active = self._active()
         if not active:
@@ -2627,17 +2633,17 @@ class BriefingScreen(ModalScreen[None]):
         cap = int(self.hours / 0.5)
         yest = self._yesterday()
         lines = [
-            T(
-                "brief_m_today",
-                p=len(planned),
-                d=len(due),
-                o=len(overdue),
-            ),
-            T("brief_m_load", s=load, c=cap, h=int(self.hours)),
-            T("brief_m_yest", d=len(self._done_on(yest)), p=self._pomo_on(yest)),
+            T("brief_m_sec_today"),
+            self._hero(T("brief_k_plan"), str(len(planned))),
+            self._hero(T("brief_k_due"), str(len(due))),
+            self._hero(T("brief_k_over"), str(len(overdue))),
+            "  " + T("brief_m_load", s=load, c=cap, h=int(self.hours)),
+            "  " + T("brief_m_yest", d=len(self._done_on(yest)), p=self._pomo_on(yest)),
         ]
         streak = self._streak(self._by_date())
-        lines.append(T("stats_serie", n=streak) if streak else T("stats_serie_off"))
+        lines.append(
+            "  " + (T("stats_serie", n=streak) if streak else T("stats_serie_off"))
+        )
         top = [
             (t_id, reasons)
             for t_id, _s, reasons in plan_day(
@@ -2646,34 +2652,39 @@ class BriefingScreen(ModalScreen[None]):
             if not any(k in ("plan_cut", "plan_skipped") for k, _p in reasons)
         ][:5]
         if top:
-            lines.append(T("brief_m_top"))
+            lines.append(T("brief_m_sec_top"))
             by_id = {t.id: t for t in active}
             for t_id, reasons in top:
                 t = by_id.get(t_id)
                 title = t.title if t else f"#{t_id}"
+                lines.append(f"  • {title}")
                 why = ", ".join(T(k, **p) for k, p in reasons)
-                lines.append(f"  • {title}  [dim]({why})[/]")
+                if why:
+                    lines.append(f"    [dim]({why})[/]")
         lines.append(T("brief_m_hint"))
         return lines
 
     def _evening_lines(self) -> list[str]:
         done = self._done_on(self.today)
         left = [t for t in self._active() if t.planned_for == self.today]
-        lines = [
-            T(
-                "brief_e_done",
-                d=len(done),
-                g=self.daily_goal,
-                p=self._pomo_on(self.today),
-            )
-        ]
-        streak = self._streak(self._by_date())
-        lines.append(T("stats_serie", n=streak) if streak else T("stats_serie_off"))
-        if left:
-            lines.append(T("brief_e_left_t"))
-            lines.extend(f"  • {t.title}  [dim]#{t.id}[/]" for t in left)
+        pomo = self._pomo_on(self.today)
+        if self.daily_goal > 0:
+            filled = min(10, max(0, round(len(done) / self.daily_goal * 10)))
+            bar = "█" * filled + "░" * (10 - filled)
+            count = f"{len(done)}/{self.daily_goal} · {pomo} 🍅  {bar}"
         else:
-            lines.append(T("brief_e_left_empty"))
+            count = f"{len(done)} · {pomo} 🍅"
+        lines = [T("brief_e_sec_done"), f"  {count}"]
+        streak = self._streak(self._by_date())
+        lines.append(
+            "  " + (T("stats_serie", n=streak) if streak else T("stats_serie_off"))
+        )
+        lines.append(T("brief_e_sec_left"))
+        if left:
+            for t in left:
+                lines.append(f"  • {t.title}")
+        else:
+            lines.append("  " + T("brief_e_left_empty"))
         lines.append(T("brief_e_hint"))
         return lines
 
