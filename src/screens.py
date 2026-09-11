@@ -641,10 +641,16 @@ class ThemeListScreen(ModalScreen[str | None]):
         min-width: 16;
         height: 3;
         margin-bottom: 0;
+        text-align: left;
+        content-align: left middle;
     }
     """
 
-    BINDINGS = [Binding("escape", "close", "Chiudi")]
+    BINDINGS = [
+        Binding("escape", "close", "Chiudi"),
+        Binding("up", "cursor_up", "Su", show=False, priority=True),
+        Binding("down", "cursor_down", "Giu", show=False, priority=True),
+    ]
 
     def __init__(self, themes: list[str], current: str) -> None:
         super().__init__()
@@ -674,6 +680,34 @@ class ThemeListScreen(ModalScreen[str | None]):
             self.dismiss(None)
         elif event.button.id.startswith("theme-"):
             self.dismiss(event.button.id[len("theme-") :])
+
+    def _focusables(self) -> list[Button]:
+        try:
+            return [
+                *self.query("#theme-list Button"),
+                self.query_one("#theme-close", Button),
+            ]
+        except Exception:
+            return []
+
+    def _step_focus(self, delta: int) -> None:
+        items = self._focusables()
+        if not items:
+            return
+        try:
+            cur = items.index(self.focused)
+        except ValueError:
+            cur = -1 if delta > 0 else 0
+        try:
+            items[(cur + delta) % len(items)].focus()
+        except Exception:
+            pass
+
+    def action_cursor_up(self) -> None:
+        self._step_focus(-1)
+
+    def action_cursor_down(self) -> None:
+        self._step_focus(1)
 
     def action_close(self) -> None:
         self.dismiss(None)
