@@ -251,6 +251,12 @@ Regole dure:
   Buongiorno/Review, schermata AI dedicata in Sistema, chiave via
   `TASKO_AI_KEY`/file 0600/campo mascherato, schermata Connessioni prima dei
   comandi). Non partire senza via libera esplicito.
+- **Progetto Ponte-Calendario** (integrazione Calendario stile Todoist, pianificato
+  2026-09-12, non iniziato): overlay eventi read-only solo in Agenda + push manuale
+  dei soli task con ora su calendario separato `Tasko` + reschedule-back limitato.
+  Google Calendar prima (BYO client-ID, loopback stdlib), Outlook dopo; mai sync
+  Tasks/To Do come task-list, mai auto-sync. Dettagli in
+  `docs/piano-ponte-calendario.md`. Non partire senza via libera esplicito.
 - **Web app sullo stesso backend** (proposta utente): opzioni A read-only → B server locale CRUD
   (TUI/CLI client, telefono via LAN) → C hosting pubblico. Serve risposta a: basta la LAN?
   autostart invisibile? stack Python+template o altro? Slice A come validazione con stop se inutile.
