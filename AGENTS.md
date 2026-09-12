@@ -34,6 +34,9 @@ src/screens.py   33 modali (solo models/storage/lang/nlparse, mai app) — via p
 src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen;
                  sigilli #tag *progetto !prio ~stima //note, parse_with_found() per merge
 src/plan.py      plan_day() pura: score, capacita' ore/0.5 🍅, motivi (chiave, params)
+src/domain.py    regole di dominio pure (stato+ricorrenza, pomodori, form, piani):
+                 mutano solo i TodoItem passati, timestamp espliciti, mai I/O/UI;
+                 app/screen applicano e persistono via store.commit()
 src/models.py    TodoItem, Priority, Recurrence, validazioni date, MAX_DEPTH=6;
                  campi extra: stima_pomo, planned_for, plan_skip (scarto piano smart, data)
 src/store.py     TodoStore: lookup id, mutazioni, next_id, commit() = UNICO punto di scrittura todos
