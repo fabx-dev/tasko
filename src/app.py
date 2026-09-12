@@ -471,6 +471,20 @@ class TodoApp(App):
     def _save_data(self) -> None:
         self.store.commit()
 
+    def _commit_refresh(self, notify_key: str | None = None, **params) -> None:
+        """Salva su disco, riaggiorna la tabella e (opzionale) notifica.
+
+        Pattern standard delle action: muta -> commit -> refresh -> notify."""
+        self._save_data()
+        self._populate_table()
+        if notify_key is not None:
+            self.notify(T(notify_key, **params))
+
+    def _on_plan_changed(self) -> None:
+        """Callback delle screen di pianificazione: salva e aggiorna la tabella."""
+        self._save_data()
+        self._populate_table()
+
     def _save_config(self) -> None:
         try:
             save_config(self.config)
@@ -547,9 +561,7 @@ class TodoApp(App):
         self._save_config()
         if choice == "demo":
             self.store.replace_all(_demo_todos(self.store.next_id))
-            self._save_data()
-            self._populate_table()
-            self.notify(T("n_welcome_demo"))
+            self._commit_refresh("n_welcome_demo")
         else:
             self.notify(T("n_welcome"))
 
@@ -807,9 +819,7 @@ class TodoApp(App):
                     todo_id=self.store.allocate_id(),
                 )
                 self.store.add(todo)
-                self._save_data()
-                self._populate_table()
-                self.notify(T("n_added", t=todo.title))
+                self._commit_refresh("n_added", t=todo.title)
 
         self.push_screen(TodoFormScreen(title=T("form_new")), on_submit)
 
@@ -831,9 +841,7 @@ class TodoApp(App):
                 todo.tags = result["tags"]
                 todo.project = result.get("project", "")
                 todo.stima_pomo = result.get("stima_pomo", 0)
-                self._save_data()
-                self._populate_table()
-                self.notify(T("n_updated", t=todo.title))
+                self._commit_refresh("n_updated", t=todo.title)
                 if reopen_detail:
                     self.push_screen(
                         DetailScreen(todo, self.todos), self._on_detail_closed
@@ -862,9 +870,7 @@ class TodoApp(App):
                 desc_ids = {d.id for d in descendants}
                 removed = self.store.remove_ids({todo.id} | desc_ids)
                 self._undo_stack.append(removed)
-                self._save_data()
-                self._populate_table()
-                self.notify(T("n_deleted", t=todo.title))
+                self._commit_refresh("n_deleted", t=todo.title)
 
         self.push_screen(ConfirmScreen(msg), on_confirm)
 
@@ -922,9 +928,7 @@ class TodoApp(App):
                 )
                 self.store.add(new_todo)
                 self.notify(T("n_recur", t=new_todo.title, d=new_due))
-        self._save_data()
-        self._populate_table()
-        self.notify(T("n_state", t=todo.title, s=nuovo))
+        self._commit_refresh("n_state", t=todo.title, s=nuovo)
 
     def action_add_subtask(self) -> None:
         todo = self._get_selected_todo()
@@ -954,9 +958,7 @@ class TodoApp(App):
                     stima_pomo=result.get("stima_pomo", 0),
                 )
                 self.store.add(sub)
-                self._save_data()
-                self._populate_table()
-                self.notify(T("n_sub_added", s=sub.title, p=parent_title))
+                self._commit_refresh("n_sub_added", s=sub.title, p=parent_title)
 
         self.push_screen(
             TodoFormScreen(
@@ -1014,33 +1016,25 @@ class TodoApp(App):
         self.push_screen(DayScreen(date_str, todos))
 
     def action_view_daily_plan(self) -> None:
-        def on_change() -> None:
-            self._save_data()
-            self._populate_table()
-
-        self.push_screen(DailyPlanScreen(self.todos, on_change))
+        self.push_screen(DailyPlanScreen(self.todos, self._on_plan_changed))
 
     def action_open_review(self) -> None:
-        def on_change() -> None:
-            self._save_data()
-            self._populate_table()
-
         try:
             goal = int(self.config.get("daily_goal", 0) or 0)
         except (ValueError, TypeError):
             goal = 0
-        self.push_screen(ReviewScreen(self.todos, on_change, daily_goal=goal))
+        self.push_screen(
+            ReviewScreen(self.todos, self._on_plan_changed, daily_goal=goal)
+        )
 
     def action_plan_day(self) -> None:
-        def on_change() -> None:
-            self._save_data()
-            self._populate_table()
-
         try:
             hours = float(self.config.get("day_hours", 6) or 6)
         except (ValueError, TypeError):
             hours = 6.0
-        self.push_screen(PlanProposalScreen(self.todos, on_change, hours=hours))
+        self.push_screen(
+            PlanProposalScreen(self.todos, self._on_plan_changed, hours=hours)
+        )
 
     def _briefing_evening(self) -> None:
         try:
@@ -1633,9 +1627,7 @@ class TodoApp(App):
         restored = self._undo_stack.pop()
         self.store.add_many(restored)
         self._purge_archive({t.id for t in restored if t.id is not None})
-        self._save_data()
-        self._populate_table()
-        self.notify(T("n_restored", n=len(restored)))
+        self._commit_refresh("n_restored", n=len(restored))
 
     def _purge_archive(self, ids: set) -> None:
         if not ids:
@@ -1672,9 +1664,7 @@ class TodoApp(App):
                 return
             self._undo_stack.append(removed)
             self.store.remove_ids(all_ids)
-            self._save_data()
-            self._populate_table()
-            self.notify(T("n_archived", n=len(removed)))
+            self._commit_refresh("n_archived", n=len(removed))
 
         self.push_screen(
             ConfirmScreen(T("n_arc_confirm", n=len(removed))),
@@ -1712,9 +1702,7 @@ class TodoApp(App):
                 self.store.add(t)
                 restored += 1
             save_archive([])
-            self._save_data()
-            self._populate_table()
-            self.notify(T("n_arc_emptied", n=restored))
+            self._commit_refresh("n_arc_emptied", n=restored)
             return
         if action == "one":
             try:
@@ -1731,9 +1719,7 @@ class TodoApp(App):
             self.store.add(t)
             del archive[idx]
             save_archive(archive)
-            self._save_data()
-            self._populate_table()
-            self.notify(T("n_arc_one", t=t.title))
+            self._commit_refresh("n_arc_one", t=t.title)
             self.action_view_archive()
 
     def action_new_from_template(self) -> None:
@@ -1772,9 +1758,7 @@ class TodoApp(App):
             )
             self.store.add(todo)
             created.append(todo)
-        self._save_data()
-        self._populate_table()
-        self.notify(T("n_tpl_made", n=name, c=len(created)))
+        self._commit_refresh("n_tpl_made", n=name, c=len(created))
 
     def _confirm_delete_template(self, name: str) -> None:
         if name not in self.templates:
