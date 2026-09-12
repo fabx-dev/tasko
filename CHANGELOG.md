@@ -12,6 +12,7 @@ Entries in English from now on.
 - Removed dead morning briefing / smart plan duplication (single `plan_day` call, no fake `P`/`m` hints in modals)
 - Evening report hint now states the real steps (close, then `R` for day closing)
 - Briefing and smart-plan popups use the shared modal frame; day closing uses the fixed-frame pattern (list no longer overflows on small terminals)
+- Buongiorno proposal labels no longer show internal `#id` and omit empty `()` so reasons are not cut off by the terminal width
 
 ### Removed
 - Morning-only briefing keys and menu entries (`menu_plan_*`, `menu_brief_*`, `brief_m_title/empty/sec_top/hint`)

@@ -2709,12 +2709,14 @@ class PlanProposalScreen(ModalScreen[None]):
             T(k, **p) for k, p in reasons if k not in ("plan_cut", "plan_skipped")
         )
         # Niente []: le option del SelectionList interpretano il markup Rich.
+        # Niente #id in coda: gli id interni restano nel value, cosi' i motivi
+        # (il vero contenuto della riga) non vengono troncati dal terminale.
         flags = "".join(
             f" ({T(k)})"
             for k in ("plan_cut", "plan_skipped")
             if any(k == kk for kk, _p in reasons)
         )
-        return f"{title}{extra}  #{t_id} ({why}){flags}"
+        return f"{title}{extra} ({why}){flags}" if why else f"{title}{extra}{flags}"
 
     def _context_lines(self) -> list[str]:
         """Contesto di oggi (ex briefing mattina): conteggi, carico, ieri, serie."""

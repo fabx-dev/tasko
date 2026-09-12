@@ -230,6 +230,33 @@ def test_buongiorno_mostra_contesto_e_motivi(tmp_files):
     asyncio.run(t())
 
 
+def test_label_motivi_senza_id_e_senza_parentesi_vuote(tmp_files):
+    """Label compatte: niente #id in coda (i motivi non vengono troncati),
+    niente () quando i motivi sono vuoti."""
+    from src.lang import T as _T
+    from src.screens import PlanProposalScreen
+
+    app = make_app(
+        [
+            make_todo(
+                "Un titolo piuttosto lungo per spingere la riga oltre le colonne",
+                todo_id=1,
+                due=_day(-2),
+                project="lavoro",
+            ),
+            make_todo("Semplice", todo_id=2),
+        ]
+    )
+    screen = PlanProposalScreen(app.todos, lambda: None, today=_day(0))
+    labels = {
+        t_id: screen._option_label(t_id, reasons) for t_id, _s, reasons in screen.plan
+    }
+    assert set(labels) == {1, 2}
+    assert _T("plan_overdue") in labels[1]
+    assert "#1" not in labels[1] and "#2" not in labels[2]
+    assert "()" not in labels[1] and "()" not in labels[2]
+
+
 def test_buongiorno_prima_voce_giornata(tmp_files):
     from src.lang import T as _T
 
