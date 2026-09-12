@@ -245,11 +245,11 @@ def test_frecce_ed_enter_da_tastiera(tmp_files):
             assert type(app.screen).__name__ == "MenuScreen"
             assert _open_idx(app.screen) == 1
             assert getattr(app.screen.focused, "id", None) == "menu-item-1-0"
-            # Enter sulla riga esegue (Calendario, prima voce di Viste)
+            # Enter sulla riga esegue (Mini-kanban, prima voce di Viste) e chiude il menu
             await pilot.press("enter")
             await pilot.pause()
             await pilot.pause()
-            assert type(app.screen).__name__ == "CalendarScreen"
+            assert type(app.screen).__name__ == "Screen"
 
     run(t())
 

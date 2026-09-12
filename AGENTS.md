@@ -16,19 +16,19 @@ Avvio: `tasko` (TUI) oppure `python -m src.main ...` / `.venv/bin/python -m src.
 CLI non interattiva: `tasko add|list|done|show` (+ `--porcelain`).
 
 Feature principali: task con 3 stati, sotto-task annidati, ricorrenze, progetti/tag/priorità,
-kanban (mini in home + full), calendario, settimana, piano giornaliero, pomodoro persistente
-a cicli, template (creabili, anche da progetto), statistiche, goals, salute progetti,
-archivio, backup/snapshot zip, import/export CSV + export Markdown, cifratura Fernet opzionale,
-onboarding demo, **chiusura giornata** (review serale, tasto `R`), inserimento in
-linguaggio naturale (form `ctrl+l`, CLI add), piano smart (tasto `P`), briefing
-mattina / resoconto sera (solo palette, zero rete).
+kanban (mini in home + full), agenda cronologica, calendario, settimana, piano giornaliero,
+pomodoro persistente a cicli, template (creabili, anche da progetto), statistiche, goals,
+salute progetti, archivio, backup/snapshot zip, import/export CSV + export Markdown +
+export iCal, cifratura Fernet opzionale, onboarding demo, **chiusura giornata**
+(review serale, tasto `R`), inserimento in linguaggio naturale (form `ctrl+l`, CLI add),
+piano smart (tasto `P`), briefing mattina / resoconto sera (solo palette, zero rete).
 
 ## 2. Mappa del codice
 
 ```
 src/main.py      entry point + re-export compatibilità + init lingua PRIMA degli import
-src/app.py       TodoApp(App): orchestratore (~2400 righe, 125 metodi) — è la god-class nota
-src/screens.py   32 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback;
+src/app.py       TodoApp(App): orchestratore (~2570 righe, 166 funzioni) — è la god-class nota
+src/screens.py   33 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback;
                  MenuScreen a 2 colonne (voci a sx -> sottomenu a dx,
 src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen;
                  sigilli #tag *progetto !prio ~stima //note, parse_with_found() per merge
@@ -44,7 +44,7 @@ src/commands.py  MENU_STRUCTURE (4 categorie: giornata/viste/dati/sistema, chiav
                  action + shortcut) + TaskoMenuProvider (palette `ctrl+p`, titoli
                  "Categoria › Voce"); MENU_IT piatta tenuta per compatibilita'
 src/lang.py      catalogo STRINGS it/en + key_sections (help) — vedi §4
-tests/           ~142 test; conftest.py con fixture di isolamento (vedi §5)
+tests/           ~146 test; conftest.py con fixture di isolamento (vedi §5)
 ```
 
 Flusso dati standard nelle action: muta oggetti → `store` → `_save_data()` (= `store.commit()`)
@@ -157,9 +157,11 @@ Regole dure:
   tutto allineato a sinistra, righe compatte titolo+aiuto; click/Enter apre,
   Enter entra sempre, nuovo click = toggle; frecce + 1-4 + type-to-filter,
   esc a stadi filtro/sottomenu/menu),
-  `ctrl+p` resta palette (`TaskoMenuProvider`, titoli "Categoria › Voce") ma è
-  nascosto dal footer (`Footer(show_command_palette=False)`); nel footer si mostra
-  solo `m` come `☰ Menu`; menu completo anche delle azioni con tasto; `tests/test_menu.py`.
+  categoria `Giornata` raggruppa le viste temporali (Agenda, piano giorno, piano smart,
+  settimana, calendario, briefing/resoconto/review); `ctrl+p` resta palette
+  (`TaskoMenuProvider`, titoli "Categoria › Voce") ma è nascosto dal footer
+  (`Footer(show_command_palette=False)`); nel footer si mostra solo `m` come `☰ Menu`;
+  menu completo anche delle azioni con tasto; `tests/test_menu.py`.
   Lezioni: righe come `MenuRow` (Label focusable), non Button — il Click del
   mouse (on_click sulla riga) e l'Enter (binding activate) restano
   distinguibili (Button.Pressed li confonde) e niente debounce -active;
@@ -168,6 +170,10 @@ Regole dure:
   scattano prima); gruppi dropdown pre-costruiti e commutati via classi
   (remove+mount rapidi in sequenza danno `DuplicateIds`); focus via
   `call_after_refresh` con guardia su `_open_idx`.
+- **Agenda/iCal/Menu giornata**: `AgendaScreen` cronologica (scaduti, oggi, domani,
+  prossimi 7 giorni, alta priorità senza data) solo da menu/palette; export iCal `.ics`
+  manuale dei task non completati con `due`; menu ripulito spostando calendario/settimana
+  nella categoria `Giornata`; `tests/test_agenda_ical.py`.
 - **Health layout**: `HealthScreen` passata al pattern cornice fissa
   (`#hea-box height 90%` + `#hea-list height 1fr`): a terminale piccolo la
   lista sforava e il Chiudi usciva dalla cornice; regression test
@@ -189,5 +195,5 @@ Regole dure:
 - **Web app sullo stesso backend** (proposta utente): opzioni A read-only → B server locale CRUD
   (TUI/CLI client, telefono via LAN) → C hosting pubblico. Serve risposta a: basta la LAN?
   autostart invisibile? stack Python+template o altro? Slice A come validazione con stop se inutile.
-- Quick-win rimasti: export iCal. ("Smart oggi" fatto dal planner; stime esistevano già.)
+- Quick-win rimasti: da rivalutare dopo agenda/export iCal. ("Smart oggi" fatto dal planner; stime esistevano già.)
 - Pomodoro cross-device dichiarato fuori scope v1 (timer resta locale).

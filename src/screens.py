@@ -54,6 +54,29 @@ from src.plan import plan_day
 from src.storage import _backup_sources, snapshot_info
 
 
+def _parse_day(due: str):
+    part = _due_date_part(due)
+    if not part:
+        return datetime.max.date()
+    try:
+        return datetime.strptime(part, "%Y-%m-%d").date()
+    except ValueError:
+        return datetime.max.date()
+
+
+def _agenda_due(todo: TodoItem) -> str:
+    day = _due_date_part(todo.due)
+    if not day:
+        return ""
+    try:
+        d = datetime.strptime(day, "%Y-%m-%d").date()
+        label = f"{d.day:02d}/{d.month:02d}"
+    except ValueError:
+        label = day
+    time = _due_time_part(todo.due)
+    return f"({label} {time}) " if time else f"({label}) "
+
+
 class TodoFormScreen(ModalScreen[dict | None]):
     """Modal screen to add or edit a todo item."""
 
@@ -780,6 +803,107 @@ class SearchScreen(ModalScreen[str | None]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+
+class AgendaScreen(ModalScreen[None]):
+    """Radar cronologico: scaduti, oggi, domani, prossimi 7 giorni."""
+
+    CSS = """
+    #agenda-box {
+        width: 86;
+        max-width: 95%;
+        height: 90%;
+        max-height: 90%;
+    }
+    #agenda-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+    #agenda-list {
+        height: 1fr;
+        margin-bottom: 1;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "close", "Chiudi")]
+
+    def __init__(self, all_todos: list[TodoItem]) -> None:
+        super().__init__()
+        self.all_todos = all_todos
+
+    def compose(self) -> ComposeResult:
+        today = datetime.now().date()
+        tomorrow = today + timedelta(days=1)
+        week_end = today + timedelta(days=7)
+        active = [t for t in self.all_todos if t.state != "completato"]
+        with Vertical(id="agenda-box"):
+            yield Label(T("agenda_title"), id="agenda-title")
+            with VerticalScroll(id="agenda-list"):
+                yield from self._section(
+                    T("agenda_overdue"),
+                    [
+                        t
+                        for t in active
+                        if _due_date_part(t.due) and _parse_day(t.due) < today
+                    ],
+                )
+                yield from self._section(
+                    T("agenda_today"),
+                    [t for t in active if _parse_day(t.due) == today],
+                )
+                yield from self._section(
+                    T("agenda_tomorrow"),
+                    [t for t in active if _parse_day(t.due) == tomorrow],
+                )
+                yield from self._section(
+                    T("agenda_next"),
+                    [t for t in active if tomorrow < _parse_day(t.due) <= week_end],
+                )
+                yield from self._section(
+                    T("agenda_important"),
+                    [
+                        t
+                        for t in active
+                        if not _due_date_part(t.due) and t.priority == Priority.HIGH
+                    ],
+                )
+            yield Button(T("ui_close_esc"), id="agenda-close", variant="default")
+
+    def _section(self, title: str, todos: list[TodoItem]):
+        yield Label(f"[b]{title}[/b]")
+        if not todos:
+            yield Static(f"  [dim]{T('agenda_empty')}[/]")
+            return
+        for t in sorted(
+            todos,
+            key=lambda x: (
+                _due_date_part(x.due) or "9999-99-99",
+                _due_time_part(x.due) or "99:99",
+                PRIORITY_ORDER.get(x.priority.value, 9),
+                x.title.lower(),
+            ),
+        ):
+            due = _agenda_due(t)
+            proj = f" @{t.project}" if t.project else ""
+            yield Static(
+                f"  {_status(t)} {due}{t.title}{proj}  [{t.priority.color}]{prio_disp(t.priority.value)}[/]"
+            )
+        yield Static("")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#agenda-close", Button).focus()
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "agenda-close":
+            self.dismiss()
+
+    def action_close(self) -> None:
+        self.dismiss()
 
 
 class WeekScreen(ModalScreen[None]):

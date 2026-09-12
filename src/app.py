@@ -1,6 +1,6 @@
 """Applicazione TodoApp + tabella cliccabile."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from textual.app import App, ComposeResult, SystemCommand
@@ -31,6 +31,7 @@ from src.models import (
     _status,
 )
 from src.screens import (
+    AgendaScreen,
     ArchiveScreen,
     BriefingScreen,
     CalendarScreen,
@@ -263,7 +264,7 @@ class TodoApp(App):
     ModalScreen {
         align: center middle;
     }
-    #state-box, #theme-box, #search-box, #week-box, #tpl-box, #tplc-box,
+    #state-box, #theme-box, #search-box, #agenda-box, #week-box, #tpl-box, #tplc-box,
     #tplp-box, #impcsv-box, #pomo-box, #kb-box, #detail-box, #day-box,
     #calendar-box, #plan-box, #goals-box, #stats-box, #keys-box, #set-box,
     #arc-box, #rst-box, #wel-box, #pw-box, #sec-box, #hea-box, #rev-box,
@@ -272,7 +273,7 @@ class TodoApp(App):
         background: $surface;
         padding: 1 2;
     }
-    #tpl-title, #tplc-title, #tplp-title, #impcsv-title, #goals-title,
+    #agenda-title, #tpl-title, #tplc-title, #tplp-title, #impcsv-title, #goals-title,
     #keys-title, #set-title, #arc-title, #rst-title, #wel-title,
     #pw-title, #sec-title, #rev-title, #menu-title {
         text-align: center;
@@ -288,7 +289,7 @@ class TodoApp(App):
         height: 3;
         margin-top: 1;
     }
-    #week-close, #tplp-close, #keys-close, #rst-close, #hea-close {
+    #agenda-close, #week-close, #tplp-close, #keys-close, #rst-close, #hea-close {
         width: 100%;
         min-width: 16;
         height: 3;
@@ -987,6 +988,9 @@ class TodoApp(App):
                 self.call_after_refresh(ta.scroll_cursor_visible, animate=False)
         except Exception:
             pass
+
+    def action_view_agenda(self) -> None:
+        self.push_screen(AgendaScreen(self.todos))
 
     def action_view_calendar(self) -> None:
         today = datetime.now().date()
@@ -1893,6 +1897,82 @@ class TodoApp(App):
             self.notify(T("n_exp_saved", p=md))
         except Exception as exc:
             self.notify(T("n_exp_err", e=exc), severity="error")
+
+    def action_export_ical(self) -> None:
+        """Export calendario iCal (.ics) dei task non completati con scadenza."""
+        try:
+            out_dir = _home() / "Tasko_screenshots"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ics_path = out_dir / f"tasko_calendar_{ts}.ics"
+            items = [
+                t
+                for t in self.todos
+                if t.state != "completato" and _due_date_part(t.due)
+            ]
+            stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            lines = [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//Tasko//Tasko//IT",
+                "CALSCALE:GREGORIAN",
+            ]
+            for t in sorted(items, key=lambda x: (x.due or "", self._sort_key(x))):
+                date_part = _due_date_part(t.due)
+                time_part = ""
+                parts = (t.due or "").split()
+                if len(parts) >= 2 and len(parts[1]) == 5 and parts[1][2] == ":":
+                    time_part = parts[1]
+                lines.extend(self._ical_event_lines(t, date_part, time_part, stamp))
+            lines.append("END:VCALENDAR")
+            ics_path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+            self.notify(T("n_ical_saved", p=ics_path, n=len(items)))
+        except Exception as exc:
+            self.notify(T("n_ical_err", e=exc), severity="error")
+
+    def _ical_event_lines(
+        self, todo: TodoItem, date_part: str, time_part: str, stamp: str
+    ) -> list[str]:
+        uid = f"tasko-{todo.id or abs(hash((todo.title, todo.due)))}@tasko.local"
+        desc_bits = []
+        if todo.project:
+            desc_bits.append(f"Progetto: {todo.project}")
+        if todo.tags:
+            desc_bits.append("Tags: " + ", ".join(todo.tags))
+        desc_bits.append(f"Priorita: {prio_disp(todo.priority.value)}")
+        if todo.notes:
+            desc_bits.append(todo.notes)
+        lines = [
+            "BEGIN:VEVENT",
+            f"UID:{self._ical_escape(uid)}",
+            f"DTSTAMP:{stamp}",
+            f"SUMMARY:{self._ical_escape(todo.title)}",
+            f"DESCRIPTION:{self._ical_escape(chr(10).join(desc_bits))}",
+        ]
+        if time_part:
+            start = date_part.replace("-", "") + "T" + time_part.replace(":", "") + "00"
+            lines.append(f"DTSTART:{start}")
+        else:
+            start = date_part.replace("-", "")
+            try:
+                end = (
+                    datetime.strptime(date_part, "%Y-%m-%d") + timedelta(days=1)
+                ).strftime("%Y%m%d")
+            except ValueError:
+                end = start
+            lines.append(f"DTSTART;VALUE=DATE:{start}")
+            lines.append(f"DTEND;VALUE=DATE:{end}")
+        lines.append("END:VEVENT")
+        return lines
+
+    def _ical_escape(self, value: str) -> str:
+        return (
+            str(value)
+            .replace("\\", "\\\\")
+            .replace(";", "\\;")
+            .replace(",", "\\,")
+            .replace("\n", "\\n")
+        )
 
     def action_export_stats_csv(self) -> None:
         """Export aggregati giornalieri (CSV): data, completati, pomodori."""

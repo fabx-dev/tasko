@@ -6,12 +6,15 @@ Entries in English from now on.
 ## [Unreleased]
 
 ### Added
+- Agenda view: chronological radar for overdue, today, tomorrow, next 7 days and important undated tasks
+- Manual iCal (`.ics`) export for active tasks with due dates
 - `TodoStore`: central todo container with id lookup, mutations and single `commit()` write path
 - Inter-process file locking (fcntl) with timeout for all state saves
 - Three-way per-id merge on save: CLI and TUI no longer overwrite each other
 - Tests: `test_store.py`, `test_concurrency.py`, `test_failure_paths.py`
 
 ### Fixed
+- Day menu now groups temporal views together (agenda, plans, week, calendar, briefings/review)
 - Locked (encrypted, no key) files no longer faked as corrupt `.corrotto.json` backups
 - CLI `add`/`done` go through the store (lock + merge)
 
