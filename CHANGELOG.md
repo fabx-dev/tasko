@@ -8,6 +8,15 @@ Entries in English from now on.
 ### Added
 - Unified morning view ("Buongiorno", key `P`): today context (counts, load, yesterday, streak) plus the smart proposal with inline reasons and confirm in a single screen, no print (the plan on disk is the real document)
 - Buongiorno explains its additive semantics (already planned stay, Esc writes nothing) and the summary counts items to confirm, already planned and excluded
+- Evening report has a "Go to Day closing" bridge button (one click instead of close plus `R`)
+- Evening report distinguishes "nothing planned today" from a cleared plan
+- Day closing explains its overwrite semantics (selection becomes exactly tomorrow plan) and the notification reports removed counts
+
+### Fixed
+- Evening report print no longer exports the navigation hint and notifies "Resoconto salvato"
+- Evening report hint and buttons are pinned outside the scroll, holding the frame on small terminals
+- Day closing content scrolls with pinned legend and buttons (frame held at 70x20)
+- Review and proposal labels hide internal `#id` and escape user `[brackets]` in titles
 
 ### Fixed
 - State picker is now a 2x2 grid with arrow-key navigation and Enter to choose; labels carry no key hints and the unbound `1`/`2`/`3`/`O`/`P`/`X` shortcuts are gone (legend: arrows move, Enter chooses, Esc cancels)

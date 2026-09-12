@@ -101,6 +101,11 @@ def _strip_rich_tags(line: str) -> str:
     return re.sub(rf"\[({tags})\]", "", line).strip()
 
 
+def _escape_markup(text: str) -> str:
+    """Rende letterali le parentesi quadre (i widget le leggono come Rich)."""
+    return text.replace("[", "\\[")
+
+
 def _hero_row(label: str, value: str) -> str:
     """Riga statistica allineata: label puntinata a larghezza fissa."""
     dots = "." * max(2, 16 - len(label))
@@ -2503,6 +2508,10 @@ class ReviewScreen(ModalScreen[None]):
         max-height: 90%;
     }
     #rev-list {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #rev-scroll {
         height: 1fr;
         margin-bottom: 1;
     }
@@ -2510,9 +2519,12 @@ class ReviewScreen(ModalScreen[None]):
         height: auto;
         margin-bottom: 1;
     }
+    #rev-additive {
+        height: auto;
+        margin-bottom: 1;
+    }
     #rev-legend {
         height: auto;
-        margin-top: 1;
     }
     #rev-buttons {
         width: 100%;
@@ -2591,7 +2603,8 @@ class ReviewScreen(ModalScreen[None]):
     def _option_label(t: TodoItem) -> str:
         due = _due_date_part(t.due)
         extra = f" (scad. {due})" if due else ""
-        return f"{t.title}{extra}  #{t.id}"
+        # Niente #id in coda (resta nel value) e quadre letterali nei titoli.
+        return f"{_escape_markup(t.title)}{extra}"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="rev-box"):
@@ -2599,20 +2612,22 @@ class ReviewScreen(ModalScreen[None]):
                 f"[b]{T('rev_title', date=_format_date_it(self.today))}[/b]",
                 id="rev-title",
             )
-            done = self._done_today()
-            yield Static(self._summary_text(len(done)), id="rev-summary")
-            yield Label(T("rev_cand", date=_format_date_it(self.tomorrow)))
-            cands = self._candidates()
-            if cands:
-                yield SelectionList(
-                    *[
-                        (self._option_label(t), t.id, i < 3)
-                        for i, t in enumerate(cands)
-                    ],
-                    id="rev-list",
-                )
-            else:
-                yield Static(T("rev_empty_cand"))
+            yield Static(T("rev_additive"), id="rev-additive")
+            with VerticalScroll(id="rev-scroll"):
+                done = self._done_today()
+                yield Static(self._summary_text(len(done)), id="rev-summary")
+                yield Label(T("rev_cand", date=_format_date_it(self.tomorrow)))
+                cands = self._candidates()
+                if cands:
+                    yield SelectionList(
+                        *[
+                            (self._option_label(t), t.id, i < 3)
+                            for i, t in enumerate(cands)
+                        ],
+                        id="rev-list",
+                    )
+                else:
+                    yield Static(T("rev_empty_cand"))
             yield Static(T("rev_legend"), id="rev-legend")
             with Horizontal(id="rev-buttons"):
                 yield Button(T("form_save"), id="rev-confirm", variant="default")
@@ -2652,6 +2667,7 @@ class ReviewScreen(ModalScreen[None]):
     def _confirm(self) -> None:
         selected = self._selected_ids()
         n = 0
+        k = 0
         for t in self.all_todos:
             if t.state != "attivo":
                 continue
@@ -2660,8 +2676,9 @@ class ReviewScreen(ModalScreen[None]):
                 n += 1
             elif t.planned_for == self.tomorrow:
                 t.planned_for = ""
+                k += 1
         self.on_change()
-        self.notify(T("n_rev_saved", n=n))
+        self.notify(T("n_rev_saved", n=n, k=k))
         self.dismiss()
 
 
@@ -2757,7 +2774,7 @@ class PlanProposalScreen(ModalScreen[None]):
 
     def _option_label(self, t_id: int, reasons) -> str:
         t = self.by_id.get(t_id)
-        title = t.title if t else f"#{t_id}"
+        title = _escape_markup(t.title) if t else f"#{t_id}"
         due = _due_date_part(t.due) if t else ""
         extra = f" (scad. {due})" if due else ""
         why = ", ".join(
@@ -2907,7 +2924,7 @@ class PlanProposalScreen(ModalScreen[None]):
         self.dismiss()
 
 
-class BriefingScreen(ModalScreen[None]):
+class BriefingScreen(ModalScreen[str | None]):
     """Resoconto sera: solo composizione di dati esistenti (zero rete)."""
 
     CSS = """
@@ -2927,6 +2944,10 @@ class BriefingScreen(ModalScreen[None]):
     #brief-buttons Button {
         width: 1fr;
         height: 3;
+    }
+    #brief-hint {
+        height: auto;
+        margin-top: 1;
     }
     #brief-title {
         text-align: center;
@@ -3006,10 +3027,11 @@ class BriefingScreen(ModalScreen[None]):
         lines.append(T("brief_e_sec_left"))
         if left:
             for t in left:
-                lines.append(f"  • {t.title}")
-        else:
+                lines.append(f"  • {_escape_markup(t.title)}")
+        elif any((t.planned_for or "") == self.today for t in self.all_todos):
             lines.append("  " + T("brief_e_left_empty"))
-        lines.append(T("brief_e_hint"))
+        else:
+            lines.append("  " + T("brief_e_left_never"))
         return lines
 
     def compose(self) -> ComposeResult:
@@ -3027,8 +3049,10 @@ class BriefingScreen(ModalScreen[None]):
                         classes="brief-line" if first else "brief-head",
                     )
                     first = False
+            yield Static(T("brief_e_hint"), id="brief-hint")
             with Horizontal(id="brief-buttons"):
                 yield Button(T("brief_print"), id="brief-print", variant="default")
+                yield Button(T("brief_goto"), id="brief-goto", variant="default")
                 yield Button(T("ui_close_esc"), id="brief-close", variant="default")
 
     def on_mount(self) -> None:
@@ -3042,6 +3066,8 @@ class BriefingScreen(ModalScreen[None]):
             self.dismiss()
         elif event.button.id == "brief-print":
             self._print()
+        elif event.button.id == "brief-goto":
+            self.dismiss("review")
 
     def action_close(self) -> None:
         self.dismiss()

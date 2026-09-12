@@ -1055,7 +1055,14 @@ class TodoApp(App):
             path.write_text(text, encoding="utf-8")
             return path
 
-        self.push_screen(BriefingScreen(self.todos, daily_goal=goal, on_print=on_print))
+        def on_briefing_done(result: str | None) -> None:
+            if result == "review":
+                self.action_open_review()
+
+        self.push_screen(
+            BriefingScreen(self.todos, daily_goal=goal, on_print=on_print),
+            on_briefing_done,
+        )
 
     def action_briefing_evening(self) -> None:
         self._briefing_evening()

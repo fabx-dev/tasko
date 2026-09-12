@@ -217,6 +217,15 @@ Regole dure:
   `tests/test_state.py` (Space, frecce su/giu/sx/dx, Enter, numeri inerti,
   click, esc-no-write). Lezione test: filtro default `attivo` nasconde i
   sospesi; `screen_texts` ignora i bottoni (marker verificato sul widget).
+- **Flusso sera**: `ReviewScreen` con riga `rev_additive` (sovrascrittura
+  dichiarata) + notify con rimossi + label senza `#id` + escape `[...]` nei
+  titoli (helper `_escape_markup`, riusato anche in Buongiorno); contenuto in
+  scroll con legend+bottoni fissi (il test a 70x20 falliva dopo l'aggiunta
+  della riga); `BriefingScreen` sera con hint fisso fuori scroll + bottone
+  ponte `brief_goto` (dismiss `"review"` + callback `on_briefing_done`, niente
+  shortcut nuovi), stampa senza hint, empty mai-pianificato vs svuotato;
+  chiavi `rev_additive/brief_goto/brief_e_left_never`; niente fusione
+  (intenti distinti: celebrare oggi vs decidere domani).
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 

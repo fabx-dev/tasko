@@ -102,6 +102,77 @@ def test_review_senza_candidati(tmp_files):
     run(t())
 
 
+def test_review_riga_semantica_e_label_senza_id(tmp_files):
+    """Riga additiva/sovrascrittiva visibile; label senza #id interni."""
+    from src.lang import T as _T
+
+    async def t():
+        app = make_app(
+            [
+                make_todo("A", todo_id=1),
+                make_todo("Task [x] con quadre", todo_id=2),
+            ]
+        )
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_open_review()
+            await pilot.pause()
+            await pilot.pause()
+            txt = screen_texts(app.screen)
+            assert _T("rev_additive") in txt
+            labels = " ".join(
+                str(o.prompt) for o in app.screen.query_one(SelectionList)._options
+            )
+            assert "#1" not in labels and "#2" not in labels
+            # quadre utente rese letterali, non mangiate dal markup
+            assert "Task [x] con quadre" in labels
+
+    run(t())
+
+
+def test_review_notify_con_rimossi_e_esc_no_write(tmp_files):
+    """Notify con aggiunti/rimossi; Esc non scrive nulla."""
+    from unittest.mock import patch
+
+    from src.lang import T as _T
+
+    async def t():
+        app = make_app(
+            [
+                make_todo("A", todo_id=1, due=_ds(-1)),
+                make_todo("B", todo_id=2),
+                make_todo("C", todo_id=3, planned_for=_ds(1)),
+            ]
+        )
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_open_review()
+            await pilot.pause()
+            await pilot.pause()
+            sl = app.screen.query_one(SelectionList)
+            sl.deselect_all()
+            sl.select(2)
+            with patch.object(app, "notify") as mocked:
+                await pilot.press("s")
+                await pilot.pause()
+                await pilot.pause()
+            assert type(app.screen).__name__ != "ReviewScreen"
+            assert _T("n_rev_saved", n=1, k=1) in str(mocked.call_args)
+            by_id = {t.id: t for t in app.todos}
+            assert by_id[2].planned_for == _ds(1)
+            assert by_id[3].planned_for == ""
+            # Esc su riapertura: piano intoccato
+            app.action_open_review()
+            await pilot.pause()
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+            await pilot.pause()
+            assert by_id[2].planned_for == _ds(1)
+
+    run(t())
+
+
 def test_review_in_menu(tmp_files):
     assert "Chiusura giornata" in [t for t, _, _ in m.TaskoMenuProvider.MENU_IT]
 

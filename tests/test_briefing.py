@@ -56,11 +56,59 @@ def test_sera(tmp_files):
             assert "P-piano" in txt  # rimasto in piano
             assert "#1" not in txt  # niente id interni
             assert T("brief_e_hint") in txt
+            # hint fuori dallo scroll: widget fisso dedicato
+            app.screen.query_one("#brief-hint")
             from textual.widgets import Button
 
             box = app.screen.query_one("#brief-box").region
-            btn = app.screen.query_one("#brief-close", Button).region
-            assert btn.y >= box.y and btn.y + btn.height <= box.y + box.height
+            for bid in ("#brief-print", "#brief-goto", "#brief-close"):
+                r = app.screen.query_one(bid, Button).region
+                assert r.x >= box.x and r.x + r.width <= box.x + box.width
+                assert r.y >= box.y and r.y + r.height <= box.y + box.height
+
+    asyncio.run(t())
+
+
+def test_ponte_verso_chiusura(tmp_files):
+    """Bottone Vai alla Chiusura: chiude il Resoconto e apre la Chiusura."""
+    from textual.widgets import Button
+
+    async def t():
+        app = make_app(_todos())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_briefing_evening()
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "BriefingScreen"
+            app.screen.query_one("#brief-goto", Button).active_effect_duration = 0
+            await pilot.click("#brief-goto")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "ReviewScreen"
+
+    asyncio.run(t())
+
+
+def test_layout_terminale_piccolo(tmp_files):
+    """Hint e bottoni fissi: tutto dentro la cornice anche a 80x24."""
+
+    async def t():
+        todos = _todos() + [
+            make_todo(f"Rimasto-{i}", todo_id=10 + i, planned_for=_day(0))
+            for i in range(8)
+        ]
+        app = make_app(todos)
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            app.action_briefing_evening()
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "BriefingScreen"
+            box = app.screen.query_one("#brief-box").region
+            for bid in ("#brief-hint", "#brief-print", "#brief-goto", "#brief-close"):
+                r = app.screen.query_one(bid).region
+                assert r.y >= box.y and r.y + r.height <= box.y + box.height
 
     asyncio.run(t())
 
@@ -89,6 +137,8 @@ def test_stampa_sera(tmp_files, monkeypatch, tmp_path):
             assert "[b]" not in text and "[dim]" not in text
             # i titoli con [] utente resterebbero: nessun tag noto rimasto
             assert "[green]" not in text
+            # l'hint di navigazione non finisce nel documento
+            assert "Chiudi qui" not in text
 
     asyncio.run(t())
 
@@ -101,6 +151,32 @@ def test_vuoto_e_menu(tmp_files):
 
     async def t():
         app = make_app([])
+        async with app.run_test(size=(80, 30)) as pilot:
+            await pilot.pause()
+            app.action_briefing_evening()
+            await pilot.pause()
+            await pilot.pause()
+            # mai pianificato: messaggio onesto, non congratulazioni
+            assert T("brief_e_left_never") in screen_texts(app.screen)
+
+    asyncio.run(t())
+
+
+def test_vuoto_piano_svuotato(tmp_files):
+    """Tutto fatto ma c'era un piano: congratulazioni vere."""
+
+    async def t():
+        app = make_app(
+            [
+                make_todo(
+                    "Fatto",
+                    todo_id=1,
+                    done=True,
+                    completed_at=_day(0) + " 09:00",
+                    planned_for=_day(0),
+                )
+            ]
+        )
         async with app.run_test(size=(80, 30)) as pilot:
             await pilot.pause()
             app.action_briefing_evening()
