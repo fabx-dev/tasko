@@ -231,11 +231,26 @@ Regole dure:
 
 - **Sync**: accantonato (idee non chiare) — file-sync vs server vs SQLite+replica vs CRDT
   vs BaaS, vedi thread in chat. Non riaprire di iniziativa.
-- **AI provider / Sprint AI-6** (condizionato): parte SOLO se il briefing (AI-5) viene letto
-  5 giorni di fila. Design fissato: interfaccia `AIProvider` (Null/Cloud BYOK/locale-stub),
-  chiave SOLO da `TASKO_AI_KEY` o file 0600 (mai nel config in chiaro), endpoint
-  OpenAI-compatible configurabile, chiamate solo via `run_worker` con fallback a template,
-  preview-consenso prima di ogni invio cloud, zero rete nei test (fake provider).
+- **AI provider / Sprint AI-6** (sostituito da AI-1, vedi sotto; non implementare
+  il vecchio disegno: la condizione sui 5 giorni di briefing non esiste piu').
+- **Progetto AI-1** ("Chiedi a Tasko", pianificato 2026-09-12, non iniziato):
+  comandi NL (rimanda/concentra/cosa-ci-sta/scomponi) con diff da confermare +
+  schermata "AI: connessioni" stile `/connect` + calibrazione stime personale.
+  Provider in ordine Locale → ChatGPT-login (OAuth riuso Codex) → Copilot
+  (OAuth ufficiale) → API key; implementare in ordine locale, apikey, copilot,
+  codex. Regole dure: consenso-sempre (la preview e' il consenso), mai segreti
+  in config/log/notify/backup, mai rete nei test (fake provider), mai scritture
+  senza conferma (solo additivo via `store.commit()`), niente nuovi tasti
+  globali, tutto it/en, trasporto stdlib (niente nuove dipendenze).
+  Slices: 0 seam `AIProvider` → mini-slice `scomponi` end-to-end → 1a connessioni
+  (device-flow-first, token in file 0600 per provider) → 1b altri comandi → 2
+  calibrazione (locale default, sempre conferma), ognuna con stop-criterion.
+  Regola OAuth: flusso non documentato che si rompe 2 volte per cause loro →
+  la riga si toglie invece di inseguirla. Dettagli nei report UX + tecnico
+  della sessione 2026-09-12 (connessioni stile SecurityScreen, diff stile
+  Buongiorno/Review, schermata AI dedicata in Sistema, chiave via
+  `TASKO_AI_KEY`/file 0600/campo mascherato, schermata Connessioni prima dei
+  comandi). Non partire senza via libera esplicito.
 - **Web app sullo stesso backend** (proposta utente): opzioni A read-only → B server locale CRUD
   (TUI/CLI client, telefono via LAN) → C hosting pubblico. Serve risposta a: basta la LAN?
   autostart invisibile? stack Python+template o altro? Slice A come validazione con stop se inutile.
