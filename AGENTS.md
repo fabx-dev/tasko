@@ -187,6 +187,9 @@ Regole dure:
   (`action_view_workflow`, nessuno shortcut); chiavi `menu_workflow_*` +
   `workflow_*` it/en; sezione settimana con rimando esplicito a
   `Viste e analisi → Obiettivi`; `tests/test_workflow.py`.
+- **Release 0.4.0**: bump `pyproject` 0.3.0 → 0.4.0, CHANGELOG datato 2026-09-12,
+  descrizione `pyproject`/README riscritte in tono pratico + installazione in 4 passi
+  (pipx consigliato, venv per dev, verifica con `tasko --help`/`list`).
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 

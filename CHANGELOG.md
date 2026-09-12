@@ -5,7 +5,12 @@ Entries in English from now on.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-12
+
 ### Added
+- Recommended workflow guide: first Day menu entry with a 5-step daily checklist (quick add, morning, day, evening, week)
+- Natural-language capture in form (`ctrl+l`) and `tasko add "<phrase>"` with `#tag *project !prio ~estimate //note`
+- Smart day planner (`P`) with hour capacity plus morning briefing and evening report
 - Agenda view: chronological radar for overdue, today, tomorrow, next 7 days and important undated tasks
 - Manual iCal (`.ics`) export for active tasks with due dates
 - `TodoStore`: central todo container with id lookup, mutations and single `commit()` write path

@@ -1,27 +1,50 @@
 # Tasko
 
-Terminal todo manager (Textual TUI) with kanban, full pomodoro cycles, statistics, templates, backups and Italian/English UI.
+Tasko turns quick notes into a realistic day plan: natural-language capture, a smart morning proposal, pomodoro focus during the day, evening closing. Offline-first, in English or Italian, no account.
+
+```text
+Capture in seconds (n, natural language) → morning Briefing + Smart plan (P)
+→ work from the Day plan with pomodoro (o) → evening Closing (R).
+```
+
+In the app, open the menu (`m`) → `Day` → `Recommended workflow` for the 5-step daily checklist.
 
 [Leggimi in italiano](README.it.md)
 
 ![Tasko home](docs/screenshots/home.svg)
 ![Tasko stats](docs/screenshots/stats.svg)
 
-## Install
+## Install in 2 minutes
 
+1. You need Python 3.12+: check with `python3 --version`.
+2. Recommended: isolated install with pipx (puts `tasko` on your PATH):
 ```bash
 pipx install .
-# or
-pip install .
 ```
-
-Run with:
-
+From the git repo:
+```bash
+pipx install git+https://github.com/fabx-dev/tasko.git
+```
+3. Alternative for developers (virtualenv):
+```bash
+python3 -m venv .venv
+.venv/bin/pip install .
+```
+4. Start the TUI:
 ```bash
 tasko
 ```
+On first run: load the demo data to explore, or start empty.
 
-Requires Python 3.12+. Docker alternative: `docker compose up` (dev) or build from `Dockerfile`.
+Check it works:
+```bash
+tasko --help
+tasko list
+```
+
+Common issues: `pipx: command not found` (install pipx first), old Python (<3.12), separate data dir with `TASKO_HOME=/tmp/tasko-demo tasko`. Docker (`docker compose up`) is dev-only, not the main install path.
+
+Requires Python 3.12+. Built with Textual; data stays in local JSON (see Data below).
 
 ## Keys
 
