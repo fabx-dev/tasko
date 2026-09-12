@@ -277,7 +277,7 @@ class TodoApp(App):
     #agenda-title, #tpl-title, #tplc-title, #tplp-title, #impcsv-title, #goals-title,
     #keys-title, #set-title, #arc-title, #rst-title, #wel-title,
     #pw-title, #sec-title, #rev-title, #menu-title, #workflow-title,
-    #brief-title, #planp-title {
+    #brief-title, #planp-title, #state-msg {
         text-align: center;
         text-style: bold;
         color: $primary;
@@ -886,7 +886,9 @@ class TodoApp(App):
                 return
             self._apply_state(todo, choice)
 
-        self.push_screen(StateChoiceScreen(todo.title, current_label), on_pick)
+        self.push_screen(
+            StateChoiceScreen(todo.title, current_label, todo.state), on_pick
+        )
 
     def _apply_state(self, todo: TodoItem, choice: str) -> None:
         if choice == "attivo":

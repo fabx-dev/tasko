@@ -614,11 +614,6 @@ class StateChoiceScreen(ModalScreen[str | None]):
         max-width: 90%;
         height: auto;
     }
-    #state-msg {
-        text-align: center;
-        margin-bottom: 1;
-        height: auto;
-    }
     #state-buttons {
         width: 100%;
         height: auto;
@@ -635,6 +630,10 @@ class StateChoiceScreen(ModalScreen[str | None]):
         height: 3;
         margin-top: 0;
     }
+    #state-legend {
+        height: auto;
+        margin-top: 1;
+    }
     """
 
     BINDINGS = [
@@ -644,10 +643,21 @@ class StateChoiceScreen(ModalScreen[str | None]):
         Binding("3", "pick_completato", "Completato", show=False),
     ]
 
-    def __init__(self, title: str, current: str) -> None:
+    def __init__(self, title: str, current: str, current_state: str = "attivo") -> None:
         super().__init__()
         self.todo_title = title
         self.current = current
+        self.current_state = (
+            current_state
+            if current_state in ("attivo", "in_sospeso", "completato")
+            else "attivo"
+        )
+
+    _STATE_BUTTONS = (
+        ("attivo", "state_btn_attivo", "attivo-btn"),
+        ("in_sospeso", "state_btn_sospeso", "sospeso-btn"),
+        ("completato", "state_btn_completato", "completato-btn"),
+    )
 
     def compose(self) -> ComposeResult:
         with Vertical(id="state-box"):
@@ -656,14 +666,13 @@ class StateChoiceScreen(ModalScreen[str | None]):
                 id="state-msg",
             )
             with Vertical(id="state-buttons"):
-                yield Button(T("state_btn_attivo"), id="attivo-btn", variant="default")
-                yield Button(
-                    T("state_btn_sospeso"), id="sospeso-btn", variant="default"
-                )
-                yield Button(
-                    T("state_btn_completato"), id="completato-btn", variant="default"
-                )
+                for state, key, bid in self._STATE_BUTTONS:
+                    label = T(key)
+                    if state == self.current_state:
+                        label = f"● {label}"
+                    yield Button(label, id=bid, variant="default")
                 yield Button(T("ui_cancel_esc"), id="cancel-btn", variant="default")
+            yield Static(T("state_legend"), id="state-legend")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         mapping = {
@@ -676,9 +685,17 @@ class StateChoiceScreen(ModalScreen[str | None]):
         elif event.button.id in mapping:
             self.dismiss(mapping[event.button.id])
 
+    _STATE_FOCUS = {
+        "attivo": "#attivo-btn",
+        "in_sospeso": "#sospeso-btn",
+        "completato": "#completato-btn",
+    }
+
     def on_mount(self) -> None:
         try:
-            self.query_one("#attivo-btn", Button).focus()
+            self.query_one(
+                self._STATE_FOCUS.get(self.current_state, "#attivo-btn"), Button
+            ).focus()
         except Exception:
             pass
 

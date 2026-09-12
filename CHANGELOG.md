@@ -10,12 +10,12 @@ Entries in English from now on.
 - Buongiorno explains its additive semantics (already planned stay, Esc writes nothing) and the summary counts items to confirm, already planned and excluded
 
 ### Fixed
+- State picker labels show only the working keys (`Attivo [1]` etc.) instead of unbound `O`/`P`/`X`, with a `1/2/3` legend
+- State picker title states the current state plainly and marks it with `●`, focusing its button
 - Buongiorno empty state always shown when there is nothing to plan (was silently missing)
 - Buongiorno content scrolls with pinned legend and buttons, so the frame holds on small terminals
 - Buongiorno proposal labels use an em-dash for over-capacity/dismissed flags instead of extra parentheses
 - Post-confirm notification reports added, already present and postponed counts
-
-### Fixed
 - Removed dead morning briefing / smart plan duplication (single `plan_day` call, no fake `P`/`m` hints in modals)
 - Evening report hint now states the real steps (close, then `R` for day closing)
 - Briefing and smart-plan popups use the shared modal frame; day closing uses the fixed-frame pattern (list no longer overflows on small terminals)
