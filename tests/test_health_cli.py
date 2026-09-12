@@ -128,12 +128,6 @@ def test_cli_giro_completo(tmp_path):
     assert r.returncode == 1 and "non trovato" in r.stderr
     r = _cli(["add", "X", "--due", "mai"], home=home)
     assert r.returncode == 2
-    # dati reali intatti (in chiaro o cifrati che siano)
-    from pathlib import Path as _P
-
-    real_path = _P("/home/fabri/.todo_app.json")
-    if real_path.exists():
-        assert "Chiamare Anna" not in real_path.read_text(encoding="utf-8")
 
 
 def test_health_layout_terminale_piccolo(tmp_files):

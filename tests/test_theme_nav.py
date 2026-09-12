@@ -1,12 +1,6 @@
 """Test navigazione tastiera nel menu Temi (v): frecce, Tab, allineamento."""
 
-import asyncio
-
-from tests.conftest import make_app, make_todo
-
-
-def run(coro):
-    return asyncio.run(coro)
+from tests.conftest import make_app, make_todo, run
 
 
 def test_temi_frecce_tab_e_allineamento(tmp_files):

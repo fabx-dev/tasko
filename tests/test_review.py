@@ -1,20 +1,15 @@
 """Test chiusura giornata: riepilogo, preselezione, conferma piano di domani."""
 
-import asyncio
 from datetime import datetime, timedelta
 
 from textual.widgets import SelectionList
 
 import src.main as m
-from tests.conftest import make_app, make_todo, screen_texts
+from tests.conftest import make_app, make_todo, run, screen_texts
 
 
 def _ds(offset: int) -> str:
     return (datetime.now().date() + timedelta(days=offset)).strftime("%Y-%m-%d")
-
-
-def run(coro):
-    return asyncio.run(coro)
 
 
 def test_review_riepilogo_e_preselezione(tmp_files):

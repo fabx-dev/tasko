@@ -1,16 +1,11 @@
 """Agenda cronologica ed export iCal."""
 
-import asyncio
 from datetime import datetime, timedelta
 
 import src.app as app_module
 from src.lang import T
 from src.models import Priority
-from tests.conftest import make_app, make_todo, screen_texts
-
-
-def run(coro):
-    return asyncio.run(coro)
+from tests.conftest import make_app, make_todo, run, screen_texts
 
 
 def test_agenda_mostra_sezioni_temporali(tmp_files):

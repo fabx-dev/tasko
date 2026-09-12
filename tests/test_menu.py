@@ -1,24 +1,9 @@
 """Test menu per funzioni (m): voci a sinistra, sottomenu a destra, filtro."""
 
-import asyncio
-
 import src.commands as commands_module
 import src.lang as lang_module
 from src.lang import T
-from tests.conftest import make_app, make_todo, screen_texts
-
-
-def run(coro):
-    return asyncio.run(coro)
-
-
-async def _wait_for(pilot, cond, tries: int = 40):
-    """Attende una condizione (runner CI lenti: pause fisse non bastano)."""
-    for _ in range(tries):
-        await pilot.pause()
-        if cond():
-            return True
-    return cond()
+from tests.conftest import make_app, make_todo, run, screen_texts, wait_for
 
 
 def test_struttura_quattro_categorie_e_action_esistenti(tmp_files):
@@ -146,11 +131,11 @@ def test_navigazione_categorie_voci_e_chiusura(tmp_files):
             assert "›" in screen_texts(app.screen)
             # click sulla voce aperta lo chiude (toggle), click su altra apre
             await pilot.click("#menu-cat-0")
-            assert await _wait_for(pilot, lambda: _open_idx(app.screen) is None)
+            assert await wait_for(pilot, lambda: _open_idx(app.screen) is None)
             assert len(_bar_cats(app.screen)) == 4
             # altra voce: sottomenu con le sue voci
             await pilot.click("#menu-cat-1")
-            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 1)
+            assert await wait_for(pilot, lambda: _open_idx(app.screen) == 1)
             assert T("menu_cal_t") in screen_texts(app.screen)
             # esc chiude il sottomenu, resto nel menu
             await pilot.press("escape")
@@ -173,9 +158,9 @@ def test_tasto_chiudi_con_click(tmp_files):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             await _open_menu(pilot, app)
-            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
+            assert await wait_for(pilot, lambda: _open_idx(app.screen) == 0)
             await pilot.click("#menu-close")
-            assert await _wait_for(
+            assert await wait_for(
                 pilot, lambda: type(app.screen).__name__ != "MenuScreen"
             )
 
@@ -193,12 +178,12 @@ def test_scelta_voce_con_click(tmp_files):
             await pilot.pause()
             n_cat = len(commands_module.menu_categories())
             await pilot.click(f"#menu-cat-{n_cat - 1}")
-            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == n_cat - 1)
+            assert await wait_for(pilot, lambda: _open_idx(app.screen) == n_cat - 1)
             assert len(_visible_rows(app.screen, n_cat - 1)) >= 5
             target = f"#menu-item-{n_cat - 1}-2"
             assert T("menu_clearf_t") in screen_texts(app.screen)
             await pilot.click(target)
-            assert await _wait_for(
+            assert await wait_for(
                 pilot, lambda: type(app.screen).__name__ != "MenuScreen"
             )
             assert app.filter_search == "" and app.filter_tag is None
@@ -310,7 +295,7 @@ def test_righe_compatte_su_due_righe(tmp_files):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             await _open_menu(pilot, app)
-            assert await _wait_for(pilot, lambda: _open_idx(app.screen) == 0)
+            assert await wait_for(pilot, lambda: _open_idx(app.screen) == 0)
             row = app.screen.query_one("#menu-item-0-0")
             assert row.region.height == 2, row.region
             txt = screen_texts(app.screen)
@@ -334,7 +319,7 @@ def test_filtro_digitazione(tmp_files):
             await _open_menu(pilot, app)
             kanban_before = app.config.get("kanban_visible", True)
             await _type(pilot, "backup")
-            assert await _wait_for(
+            assert await wait_for(
                 pilot, lambda: T("menu_no_match") not in screen_texts(app.screen)
             )
             txt = _visible_texts(app.screen)
@@ -366,7 +351,7 @@ def test_filtro_backspace_esc_e_nessun_risultato(tmp_files):
             for ch in "zzz":
                 await pilot.press(ch)
                 await pilot.pause()
-            assert await _wait_for(
+            assert await wait_for(
                 pilot, lambda: T("menu_no_match", q="zzz") in screen_texts(app.screen)
             )
             # backspace svuota un carattere alla volta

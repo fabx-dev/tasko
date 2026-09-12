@@ -1,16 +1,11 @@
 """Test flussi UI via Textual pilot (file isolati da conftest)."""
 
-import asyncio
 from datetime import datetime, timedelta
 
 from textual.widgets import Input
 
 import src.main as m
-from tests.conftest import make_app, make_todo, screen_texts
-
-
-def run(coro):
-    return asyncio.run(coro)
+from tests.conftest import make_app, make_todo, run, screen_texts
 
 
 def test_kanban_visibile_e_toggle(tmp_files):

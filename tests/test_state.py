@@ -1,15 +1,9 @@
 """Cambia stato (Space): griglia 2x2, frecce + Enter, esc, focus sul corrente."""
 
-import asyncio
-
 from textual.widgets import Button
 
 from src.lang import T
-from tests.conftest import make_app, make_todo, screen_texts
-
-
-def run(coro):
-    return asyncio.run(coro)
+from tests.conftest import make_app, make_todo, run, screen_texts
 
 
 def test_space_apre_con_stato_corrente_e_focus(tmp_files):

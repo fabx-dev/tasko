@@ -191,11 +191,15 @@ def test_lock_startup_e_backup_cifrato(tmp_files, locked_down):
             assert type(app.screen).__name__ == "LockScreen"
             assert app.todos == []
             print("lock rifiuta: OK")
-            # corretta (attendi riabilitazione 1s)
-            import asyncio as _aio
+            # corretta (attendi la riabilitazione del campo dopo l'errore)
+            from tests.conftest import wait_for
 
-            await _aio.sleep(1.2)
-            await pilot.pause()
+            assert await wait_for(
+                pilot,
+                lambda: not app.screen.query_one("#lock-pw", Input).disabled,
+                tries=60,
+                delay=0.05,
+            )
             app.screen.query_one("#lock-pw", Input).value = "segreta12"
             await pilot.press("enter")
             await pilot.pause()

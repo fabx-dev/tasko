@@ -106,12 +106,23 @@ def test_backup_corrotto_rifiutato(tmp_files):
         raise AssertionError("doveva fallire")
 
 
-def test_backup_retention(tmp_files):
-    import time
+def test_backup_retention(tmp_files, monkeypatch):
+    from datetime import datetime as _dt
+
+    import src.storage as s
 
     m.DATA_FILE.write_text("[]")
+
+    class _FakeDT(_dt):
+        _calls = 0
+
+        @classmethod
+        def now(cls, tz=None):
+            cls._calls += 1
+            return _dt(2099, 1, 1, 0, 0, cls._calls)
+
+    monkeypatch.setattr(s, "datetime", _FakeDT)
     for _ in range(3):
         m.create_backup()
-        time.sleep(1.05)
     m.prune_snapshots(keep=2)
     assert len(m.list_snapshots()) == 2

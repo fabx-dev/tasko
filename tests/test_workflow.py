@@ -1,14 +1,8 @@
 """Workflow consigliato: voce menu Giornata + screen checklist."""
 
-import asyncio
-
 import src.commands as commands_module
 from src.lang import T
-from tests.conftest import make_app, make_todo, screen_texts
-
-
-def run(coro):
-    return asyncio.run(coro)
+from tests.conftest import make_app, make_todo, run, screen_texts
 
 
 def test_workflow_prima_voce_giornata_e_action(tmp_files):

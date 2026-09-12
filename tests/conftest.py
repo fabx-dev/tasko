@@ -1,5 +1,6 @@
 """Fixture comuni: isolano TUTTI i file reali (mai ~/.todo_* nei test)."""
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -95,3 +96,20 @@ def make_app(todos):
     app.todos = list(todos)
     app.next_id = max((t.id or 0 for t in todos), default=0) + 1
     return app
+
+
+def run(coro):
+    """Esegue una coroutine con asyncio.run (helper comune ai test UI)."""
+    return asyncio.run(coro)
+
+
+async def wait_for(pilot, cond, tries: int = 40, delay: float | None = None):
+    """Attende una condizione (runner CI lenti: pause fisse non bastano)."""
+    for _ in range(tries):
+        if delay is None:
+            await pilot.pause()
+        else:
+            await pilot.pause(delay)
+        if cond():
+            return True
+    return False
