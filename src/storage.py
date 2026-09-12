@@ -316,6 +316,14 @@ DEFAULT_TEMPLATES: dict[str, list[dict]] = {
 }
 
 
+def _default_templates() -> dict[str, list[dict]]:
+    """I template di default, copiati (valori, senza riferimenti a DEFAULT)."""
+    return {
+        k: [{"title": i["title"], "priority": i["priority"]} for i in v]
+        for k, v in DEFAULT_TEMPLATES.items()
+    }
+
+
 def _coerce_template_item(raw: dict) -> dict | None:
     title = str(raw.get("title", "") or "").strip()
     if not title:
@@ -335,22 +343,13 @@ def _coerce_template_item(raw: dict) -> dict | None:
 
 def load_templates() -> dict[str, list[dict]]:
     if not TEMPLATE_FILE.exists():
-        return {
-            k: [{"title": i["title"], "priority": i["priority"]} for i in v]
-            for k, v in DEFAULT_TEMPLATES.items()
-        }
+        return _default_templates()
     try:
         data = _read_state_file(TEMPLATE_FILE)
     except (json.JSONDecodeError, OSError, ValueError):
-        return {
-            k: [{"title": i["title"], "priority": i["priority"]} for i in v]
-            for k, v in DEFAULT_TEMPLATES.items()
-        }
+        return _default_templates()
     if not isinstance(data, dict):
-        return {
-            k: [{"title": i["title"], "priority": i["priority"]} for i in v]
-            for k, v in DEFAULT_TEMPLATES.items()
-        }
+        return _default_templates()
     out: dict[str, list[dict]] = {}
     for name, items in data.items():
         if not isinstance(name, str) or not name.strip() or not isinstance(items, list):
@@ -364,10 +363,7 @@ def load_templates() -> dict[str, list[dict]]:
                 clean.append(item)
         if clean:
             out[name.strip()] = clean
-    return out or {
-        k: [{"title": i["title"], "priority": i["priority"]} for i in v]
-        for k, v in DEFAULT_TEMPLATES.items()
-    }
+    return out or _default_templates()
 
 
 def save_templates(templates: dict[str, list[dict]]) -> None:
@@ -384,9 +380,6 @@ def save_templates(templates: dict[str, list[dict]]) -> None:
         for name, items in templates.items()
     }
     _write_atomic(TEMPLATE_FILE, _dump_state_text(serializable))
-
-
-TEMPLATES: dict[str, list[dict]] = load_templates()
 
 
 CONFIG_FILE = _home() / ".todo_config.json"
@@ -424,35 +417,15 @@ def load_config() -> dict:
         cfg["kanban_visible"] = data["kanban_visible"]
     if "filter_state" in data and data["filter_state"] in FILTER_STATES:
         cfg["filter_state"] = data["filter_state"]
-    try:
-        daily = int(data.get("daily_goal", 5))
-        cfg["daily_goal"] = daily if 0 <= daily <= 100 else 5
-    except (ValueError, TypeError):
-        cfg["daily_goal"] = 5
-    try:
-        weekly = int(data.get("weekly_goal", 25))
-        cfg["weekly_goal"] = weekly if 0 <= weekly <= 500 else 25
-    except (ValueError, TypeError):
-        cfg["weekly_goal"] = 25
-    try:
-        pomo = int(data.get("pomo_daily_goal", 8))
-        cfg["pomo_daily_goal"] = pomo if 0 <= pomo <= 100 else 8
-    except (ValueError, TypeError):
-        cfg["pomo_daily_goal"] = 8
+    cfg["daily_goal"] = _clamp_int(data.get("daily_goal", 5), 5, 0, 100)
+    cfg["weekly_goal"] = _clamp_int(data.get("weekly_goal", 25), 25, 0, 500)
+    cfg["pomo_daily_goal"] = _clamp_int(data.get("pomo_daily_goal", 8), 8, 0, 100)
     lang = str(data.get("lang", "auto")).lower()
     cfg["lang"] = lang if lang in ("auto", "it", "en") else "auto"
     cfg["onboarded"] = bool(data.get("onboarded", False))
-    try:
-        rem = int(data.get("reminder_min", 10))
-        cfg["reminder_min"] = rem if 0 <= rem <= 120 else 10
-    except (ValueError, TypeError):
-        cfg["reminder_min"] = 10
+    cfg["reminder_min"] = _clamp_int(data.get("reminder_min", 10), 10, 0, 120)
     cfg["sounds"] = bool(data.get("sounds", True))
-    try:
-        hours = int(data.get("day_hours", 6))
-        cfg["day_hours"] = hours if 1 <= hours <= 16 else 6
-    except (ValueError, TypeError):
-        cfg["day_hours"] = 6
+    cfg["day_hours"] = _clamp_int(data.get("day_hours", 6), 6, 1, 16)
     return cfg
 
 

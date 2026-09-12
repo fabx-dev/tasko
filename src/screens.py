@@ -3426,12 +3426,16 @@ class StatsScreen(ModalScreen[None]):
         prev_dec28 = datetime(y - 1, 12, 28).date()
         return (y - 1, prev_dec28.isocalendar()[1])
 
-    TIME_SLOTS: tuple[tuple[str, int, int], ...] = (
-        (T("slot_night"), 0, 6),
-        (T("slot_morning"), 6, 12),
-        (T("slot_afternoon"), 12, 18),
-        (T("slot_evening"), 18, 24),
-    )
+    @property
+    def TIME_SLOTS(self) -> tuple[tuple[str, int, int], ...]:
+        # property (non attributo di classe): T() va valutato a render-time,
+        # altrimenti le fasce restano nella lingua di avvio dopo un cambio lingua.
+        return (
+            (T("slot_night"), 0, 6),
+            (T("slot_morning"), 6, 12),
+            (T("slot_afternoon"), 12, 18),
+            (T("slot_evening"), 18, 24),
+        )
 
     @staticmethod
     def _hour_of(ts: str) -> int | None:
