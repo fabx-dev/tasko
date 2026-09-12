@@ -10,7 +10,7 @@ Entries in English from now on.
 - Buongiorno explains its additive semantics (already planned stay, Esc writes nothing) and the summary counts items to confirm, already planned and excluded
 
 ### Fixed
-- State picker labels show only the working keys (`Attivo [1]` etc.) instead of unbound `O`/`P`/`X`, with a `1/2/3` legend
+- State picker is now a 2x2 grid with arrow-key navigation and Enter to choose; labels carry no key hints and the unbound `1`/`2`/`3`/`O`/`P`/`X` shortcuts are gone (legend: arrows move, Enter chooses, Esc cancels)
 - State picker title states the current state plainly and marks it with `●`, focusing its button
 - Buongiorno empty state always shown when there is nothing to plan (was silently missing)
 - Buongiorno content scrolls with pinned legend and buttons, so the frame holds on small terminals

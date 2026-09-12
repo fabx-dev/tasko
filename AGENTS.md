@@ -209,11 +209,14 @@ Regole dure:
   scrive), summary con già-pianificati, flag con `—`, notify con aggiunti/
   presenti/rimandati, fix stato vuoto mai mostrato, contenuto in scroll con
   legend+bottoni fissi (test layout 80x24/70x20); test Esc-no-write + DB vuoto.
-- **Cambia stato uniformato**: label oneste `Attivo [1]` ecc. (via `O/P/X` mai
-  bindati), titolo con stato attuale + `●` sul bottone corrente (focus sul
-  corrente, `current_state` passato dal caller), `#state-msg` nel gruppo titoli
-  condiviso, legend `state_legend`; prima copertura dedicata
-  `tests/test_state.py` (Space, 1/2/3, click, esc-no-write, Enter no-op).
+- **Cambia stato uniformato**: griglia 2x2 con frecce spaziali (`_focus_shift` ±1/±2)
+  + Enter, via binding `1/2/3` e hint numerici; label senza tasti (`Attivo` ecc.,
+  ex `O/P/X` mai bindati), titolo con stato attuale + `●` sul bottone corrente
+  (focus sul corrente, `current_state` passato dal caller), `#state-msg` nel
+  gruppo titoli condiviso, legend `state_legend`; copertura dedicata
+  `tests/test_state.py` (Space, frecce su/giu/sx/dx, Enter, numeri inerti,
+  click, esc-no-write). Lezione test: filtro default `attivo` nasconde i
+  sospesi; `screen_texts` ignora i bottoni (marker verificato sul widget).
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 

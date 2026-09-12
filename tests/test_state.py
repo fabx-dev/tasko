@@ -1,4 +1,4 @@
-"""Cambia stato (Space): scelta 1/2/3, click, esc, focus sullo stato corrente."""
+"""Cambia stato (Space): griglia 2x2, frecce + Enter, esc, focus sul corrente."""
 
 import asyncio
 
@@ -12,10 +12,6 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def _open_via_space(pilot, app):
-    return pilot.press("space")
-
-
 def test_space_apre_con_stato_corrente_e_focus(tmp_files):
     async def t():
         app = make_app([make_todo("Da sospendere", todo_id=1, paused=True)])
@@ -24,7 +20,7 @@ def test_space_apre_con_stato_corrente_e_focus(tmp_files):
             await pilot.pause()
             app._populate_table()
             await pilot.pause()
-            await _open_via_space(pilot, app)
+            await pilot.press("space")
             await pilot.pause()
             await pilot.pause()
             assert type(app.screen).__name__ == "StateChoiceScreen"
@@ -36,32 +32,78 @@ def test_space_apre_con_stato_corrente_e_focus(tmp_files):
             sospeso_label = str(app.screen.query_one("#sospeso-btn", Button).label)
             assert sospeso_label.startswith("● ")
             assert getattr(app.screen.focused, "id", None) == "sospeso-btn"
-            # niente tasti bugiardi: solo [1]/[2]/[3] veri
-            assert "O Attivo" not in txt and "P Sospeso" not in txt
-            assert "X Fatto" not in txt
+            # niente numeri: solo frecce + Enter
+            assert "[1]" not in txt and "[2]" not in txt and "[3]" not in txt
 
     run(t())
 
 
-def test_tasti_123_cambiano_stato(tmp_files):
+def test_frecce_muovono_enter_sceglie(tmp_files):
     async def t():
         app = make_app([make_todo("A", todo_id=1)])
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            await _open_via_space(pilot, app)
+            await pilot.press("space")
+            await pilot.pause()
+            await pilot.pause()
+            # focus su Attivo (corrente): destra -> Sospeso, Enter sospende
+            assert getattr(app.screen.focused, "id", None) == "attivo-btn"
+            await pilot.press("right")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "sospeso-btn"
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ != "StateChoiceScreen"
+            assert app.todos[0].paused is True
+            # sinistra torna indietro: Attivo <- Sospeso
+            app.filter_state = "in_sospeso"
+            app._populate_table()
+            await pilot.pause()
+            await pilot.press("space")
+            await pilot.pause()
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "sospeso-btn"
+            await pilot.press("left")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "attivo-btn"
+            # giu dalla prima riga: Attivo -> Fatto
+            await pilot.press("down")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "completato-btn"
+            # su dalla seconda riga: Fatto -> Attivo
+            await pilot.press("up")
+            await pilot.pause()
+            assert getattr(app.screen.focused, "id", None) == "attivo-btn"
+            await pilot.press("down")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.pause()
+            assert app.todos[0].done is True
+
+    run(t())
+
+
+def test_numeri_non_fanno_piu_nulla(tmp_files):
+    async def t():
+        app = make_app([make_todo("A", todo_id=1)])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("space")
             await pilot.pause()
             await pilot.pause()
             await pilot.press("3")
             await pilot.pause()
             await pilot.pause()
-            assert type(app.screen).__name__ != "StateChoiceScreen"
-            by_id = {t.id: t for t in app.todos}
-            assert by_id[1].done is True
+            # nessun cambio, modale ancora aperta
+            assert type(app.screen).__name__ == "StateChoiceScreen"
+            assert app.todos[0].state == "attivo"
 
     run(t())
 
 
-def test_click_sospeso_e_esc_non_scrive(tmp_files):
+def test_click_ed_esc(tmp_files):
     async def t():
         app = make_app(
             [make_todo("A", todo_id=1), make_todo("B", todo_id=2, paused=True)]
@@ -69,7 +111,7 @@ def test_click_sospeso_e_esc_non_scrive(tmp_files):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             # click su Sospeso per il primo task (attivo)
-            await _open_via_space(pilot, app)
+            await pilot.press("space")
             await pilot.pause()
             await pilot.pause()
             app.screen.query_one("#sospeso-btn", Button).active_effect_duration = 0
@@ -85,7 +127,7 @@ def test_click_sospeso_e_esc_non_scrive(tmp_files):
             await pilot.pause()
             await pilot.press("down")
             await pilot.pause()
-            await _open_via_space(pilot, app)
+            await pilot.press("space")
             await pilot.pause()
             await pilot.pause()
             assert type(app.screen).__name__ == "StateChoiceScreen"
@@ -94,24 +136,5 @@ def test_click_sospeso_e_esc_non_scrive(tmp_files):
             await pilot.pause()
             assert type(app.screen).__name__ != "StateChoiceScreen"
             assert by_id[2].paused is True and by_id[2].done is False
-
-    run(t())
-
-
-def test_enter_sullo_stato_corrente_e_noop(tmp_files):
-    async def t():
-        app = make_app([make_todo("A", todo_id=1)])
-        async with app.run_test(size=(120, 40)) as pilot:
-            await pilot.pause()
-            await _open_via_space(pilot, app)
-            await pilot.pause()
-            await pilot.pause()
-            # focus su Attivo (corrente): Enter chiude senza errori
-            assert getattr(app.screen.focused, "id", None) == "attivo-btn"
-            await pilot.press("enter")
-            await pilot.pause()
-            await pilot.pause()
-            assert type(app.screen).__name__ != "StateChoiceScreen"
-            assert app.todos[0].state == "attivo"
 
     run(t())

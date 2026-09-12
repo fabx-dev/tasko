@@ -610,7 +610,7 @@ class StateChoiceScreen(ModalScreen[str | None]):
 
     CSS = """
     #state-box {
-        width: 36;
+        width: 38;
         max-width: 90%;
         height: auto;
     }
@@ -618,17 +618,16 @@ class StateChoiceScreen(ModalScreen[str | None]):
         width: 100%;
         height: auto;
     }
-    #state-buttons Button {
+    #state-row-1, #state-row-2 {
         width: 100%;
-        min-width: 0;
         height: 3;
-        margin: 0 0 1 0;
+        margin-bottom: 1;
     }
-    #cancel-btn {
-        width: 100%;
+    #state-row-1 Button, #state-row-2 Button {
+        width: 1fr;
         min-width: 0;
         height: 3;
-        margin-top: 0;
+        margin: 0 1;
     }
     #state-legend {
         height: auto;
@@ -638,9 +637,10 @@ class StateChoiceScreen(ModalScreen[str | None]):
 
     BINDINGS = [
         Binding("escape", "cancel", "Annulla"),
-        Binding("1", "pick_attivo", "Attivo", show=False),
-        Binding("2", "pick_sospeso", "Sospeso", show=False),
-        Binding("3", "pick_completato", "Completato", show=False),
+        Binding("left", "focus_prev", "Precedente", show=False),
+        Binding("right", "focus_next", "Successivo", show=False),
+        Binding("up", "focus_up", "Sopra", show=False),
+        Binding("down", "focus_down", "Sotto", show=False),
     ]
 
     def __init__(self, title: str, current: str, current_state: str = "attivo") -> None:
@@ -653,11 +653,11 @@ class StateChoiceScreen(ModalScreen[str | None]):
             else "attivo"
         )
 
-    _STATE_BUTTONS = (
-        ("attivo", "state_btn_attivo", "attivo-btn"),
-        ("in_sospeso", "state_btn_sospeso", "sospeso-btn"),
-        ("completato", "state_btn_completato", "completato-btn"),
-    )
+    def _button_label(self, state: str, key: str) -> str:
+        label = T(key)
+        if state == self.current_state:
+            label = f"● {label}"
+        return label
 
     def compose(self) -> ComposeResult:
         with Vertical(id="state-box"):
@@ -666,12 +666,24 @@ class StateChoiceScreen(ModalScreen[str | None]):
                 id="state-msg",
             )
             with Vertical(id="state-buttons"):
-                for state, key, bid in self._STATE_BUTTONS:
-                    label = T(key)
-                    if state == self.current_state:
-                        label = f"● {label}"
-                    yield Button(label, id=bid, variant="default")
-                yield Button(T("ui_cancel_esc"), id="cancel-btn", variant="default")
+                with Horizontal(id="state-row-1"):
+                    yield Button(
+                        self._button_label("attivo", "state_btn_attivo"),
+                        id="attivo-btn",
+                        variant="default",
+                    )
+                    yield Button(
+                        self._button_label("in_sospeso", "state_btn_sospeso"),
+                        id="sospeso-btn",
+                        variant="default",
+                    )
+                with Horizontal(id="state-row-2"):
+                    yield Button(
+                        self._button_label("completato", "state_btn_completato"),
+                        id="completato-btn",
+                        variant="default",
+                    )
+                    yield Button(T("ui_cancel_esc"), id="cancel-btn", variant="default")
             yield Static(T("state_legend"), id="state-legend")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -702,14 +714,33 @@ class StateChoiceScreen(ModalScreen[str | None]):
     def action_cancel(self) -> None:
         self.dismiss(None)
 
-    def action_pick_attivo(self) -> None:
-        self.dismiss("attivo")
+    _STATE_FOCUS_IDS = ("attivo-btn", "sospeso-btn", "completato-btn", "cancel-btn")
 
-    def action_pick_sospeso(self) -> None:
-        self.dismiss("in_sospeso")
+    def _focus_shift(self, delta: int) -> None:
+        """Sposta il focus di delta posizioni nella griglia 2x2."""
+        try:
+            focused = self.focused
+            cur = focused.id if focused is not None else None
+            idx = (
+                self._STATE_FOCUS_IDS.index(cur) if cur in self._STATE_FOCUS_IDS else 0
+            )
+            nxt = idx + delta
+            if 0 <= nxt < len(self._STATE_FOCUS_IDS):
+                self.query_one(f"#{self._STATE_FOCUS_IDS[nxt]}", Button).focus()
+        except Exception:
+            pass
 
-    def action_pick_completato(self) -> None:
-        self.dismiss("completato")
+    def action_focus_prev(self) -> None:
+        self._focus_shift(-1)
+
+    def action_focus_next(self) -> None:
+        self._focus_shift(1)
+
+    def action_focus_up(self) -> None:
+        self._focus_shift(-2)
+
+    def action_focus_down(self) -> None:
+        self._focus_shift(2)
 
 
 class ThemeListScreen(ModalScreen[str | None]):
