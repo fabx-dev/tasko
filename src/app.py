@@ -16,6 +16,7 @@ from textual.widgets import (
 )
 
 from src import crypto as _crypto
+from src import domain
 from src.commands import TaskoMenuProvider, menu_categories
 from src.lang import T, prio_disp, rec_disp
 from src.models import (
@@ -840,14 +841,7 @@ class TodoApp(App):
     def _open_edit_form(self, todo: TodoItem, reopen_detail: bool = False) -> None:
         def on_submit(result: dict | None) -> None:
             if result:
-                todo.title = result["title"]
-                todo.priority = result["priority"]
-                todo.due = result["due"]
-                todo.notes = result["notes"]
-                todo.recurrence = result["recurrence"]
-                todo.tags = result["tags"]
-                todo.project = result.get("project", "")
-                todo.stima_pomo = result.get("stima_pomo", 0)
+                domain.apply_form(todo, result)
                 self._commit_refresh("n_updated", t=todo.title)
                 if reopen_detail:
                     self.push_screen(
@@ -904,38 +898,17 @@ class TodoApp(App):
         )
 
     def _apply_state(self, todo: TodoItem, choice: str) -> None:
-        if choice == "attivo":
-            todo.done = False
-            todo.paused = False
-            todo.completed_at = ""
-            nuovo = T("n_to_active")
-        elif choice == "in_sospeso":
-            todo.done = False
-            todo.paused = True
-            todo.completed_at = ""
-            nuovo = T("n_to_paused")
-        else:  # completato
-            todo.paused = False
-            todo.done = True
-            todo.planned_for = ""
-            todo.completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
-            nuovo = T("n_to_done")
-            if todo.recurrence != Recurrence.NONE and todo.due:
-                new_due = todo.recurrence.next_date(todo.due)
-                new_todo = TodoItem(
-                    title=todo.title,
-                    priority=todo.priority,
-                    due=new_due,
-                    notes=todo.notes,
-                    parent_id=todo.parent_id,
-                    recurrence=todo.recurrence,
-                    tags=list(todo.tags),
-                    project=todo.project,
-                    todo_id=self.store.allocate_id(),
-                )
-                self.store.add(new_todo)
-                self.notify(T("n_recur", t=new_todo.title, d=new_due))
-        self._commit_refresh("n_state", t=todo.title, s=nuovo)
+        labels = {
+            "attivo": T("n_to_active"),
+            "in_sospeso": T("n_to_paused"),
+            "completato": T("n_to_done"),
+        }
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        new_todo = domain.apply_state(todo, choice, now)
+        if new_todo is not None:
+            self.store.add(new_todo)
+            self.notify(T("n_recur", t=new_todo.title, d=new_todo.due))
+        self._commit_refresh("n_state", t=todo.title, s=labels[choice])
 
     def action_add_subtask(self) -> None:
         todo = self._get_selected_todo()
@@ -1422,8 +1395,7 @@ class TodoApp(App):
             if datetime.now() < end:
                 break
             if phase == "focus":
-                todo.pomodoros += 1
-                todo.pomodoro_log.append(end.strftime("%Y-%m-%d %H:%M"))
+                domain.credit_pomodoro(todo, end.strftime("%Y-%m-%d %H:%M"))
                 self._save_data()
                 credited += 1
                 self.pomo_cycle += 1
@@ -1493,8 +1465,7 @@ class TodoApp(App):
     def _complete_focus(self) -> None:
         todo = self.store.by_id(self.focus_task_id)
         if todo:
-            todo.pomodoros += 1
-            todo.pomodoro_log.append(datetime.now().strftime("%Y-%m-%d %H:%M"))
+            domain.credit_pomodoro(todo, datetime.now().strftime("%Y-%m-%d %H:%M"))
             self._save_data()
         self.pomo_cycle += 1
         kind = "long" if self.pomo_cycle % self.POMO_LONG_EVERY == 0 else "short"

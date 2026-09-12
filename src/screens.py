@@ -23,6 +23,7 @@ from textual.widgets import (
 )
 
 from src import crypto as _crypto
+from src import domain
 from src.lang import (
     T,
     days_long,
@@ -2432,7 +2433,7 @@ class DailyPlanScreen(CloseMixin, ModalScreen[None]):
         if todo is None:
             self.notify(T("n_plan_noop"), severity="warning")
             return
-        todo.planned_for = self.today
+        domain.plan_add(todo, self.today)
         self._refresh_keep(tid)
         self.notify(T("n_plan_added", t=todo.title))
 
@@ -2443,7 +2444,7 @@ class DailyPlanScreen(CloseMixin, ModalScreen[None]):
             return
         for t in self.all_todos:
             if t.id == tid and t.planned_for == self.today and t.state == "attivo":
-                t.planned_for = ""
+                domain.plan_remove(t)
                 self._refresh_keep(tid)
                 return
         self.notify(T("n_plan_rm_none"), severity="warning")
@@ -2455,7 +2456,7 @@ class DailyPlanScreen(CloseMixin, ModalScreen[None]):
             return
         for t in self.all_todos:
             if t.planned_for == self.today and t.id == tid and t.state == "attivo":
-                t.paused = True
+                domain.plan_suspend(t)
                 self._refresh_keep(tid)
                 return
         self.notify(T("n_plan_susp_none"), severity="warning")
@@ -2611,17 +2612,7 @@ class ReviewScreen(CloseMixin, ModalScreen[None]):
 
     def _confirm(self) -> None:
         selected = self._selected_ids()
-        n = 0
-        k = 0
-        for t in self.all_todos:
-            if t.state != "attivo":
-                continue
-            if t.id in selected:
-                t.planned_for = self.tomorrow
-                n += 1
-            elif t.planned_for == self.tomorrow:
-                t.planned_for = ""
-                k += 1
+        n, k = domain.review_plan(self.all_todos, selected, self.tomorrow)
         self.on_change()
         self.notify(T("n_rev_saved", n=n, k=k))
         self.dismiss()
@@ -2842,19 +2833,7 @@ class PlanProposalScreen(CloseMixin, ModalScreen[None]):
     def _confirm(self) -> None:
         # Solo additivo: aggiunge i selezionati, non toglie mai i pianificati.
         selected = self._selected_ids()
-        n = 0
-        r = 0
-        for t in self.all_todos:
-            if t.state != "attivo":
-                continue
-            if t.id in selected:
-                t.planned_for = self.today
-                t.plan_skip = ""
-                n += 1
-            elif t.planned_for != self.today:
-                if t.plan_skip != self.today:
-                    r += 1
-                t.plan_skip = self.today
+        n, r = domain.proposal_plan(self.all_todos, selected, self.today)
         self.on_change()
         self.notify(T("n_planp_saved", n=n, k=self.n_planned, r=r))
         self.dismiss()
