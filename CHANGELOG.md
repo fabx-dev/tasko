@@ -7,6 +7,13 @@ Entries in English from now on.
 
 ### Added
 - Unified morning view ("Buongiorno", key `P`): today context (counts, load, yesterday, streak) plus the smart proposal with inline reasons and confirm in a single screen, no print (the plan on disk is the real document)
+- Buongiorno explains its additive semantics (already planned stay, Esc writes nothing) and the summary counts items to confirm, already planned and excluded
+
+### Fixed
+- Buongiorno empty state always shown when there is nothing to plan (was silently missing)
+- Buongiorno content scrolls with pinned legend and buttons, so the frame holds on small terminals
+- Buongiorno proposal labels use an em-dash for over-capacity/dismissed flags instead of extra parentheses
+- Post-confirm notification reports added, already present and postponed counts
 
 ### Fixed
 - Removed dead morning briefing / smart plan duplication (single `plan_day` call, no fake `P`/`m` hints in modals)

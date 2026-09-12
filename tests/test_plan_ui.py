@@ -257,6 +257,73 @@ def test_label_motivi_senza_id_e_senza_parentesi_vuote(tmp_files):
     assert "()" not in labels[1] and "()" not in labels[2]
 
 
+def test_buongiorno_db_vuoto_mostra_messaggio(tmp_files):
+    """Zero task attivi: il messaggio di vuoto e' sempre visibile (era un bug)."""
+    from src.lang import T as _T
+
+    async def t():
+        app = make_app([])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "PlanProposalScreen"
+            txt = screen_texts(app.screen)
+            assert _T("planp_empty") in txt
+            assert _T("planp_additive", m=0) in txt
+
+    asyncio.run(t())
+
+
+def test_buongiorno_esc_non_scrive_nulla(tmp_files):
+    """Esc/Annulla: planned_for e plan_skip restano intoccati."""
+    from textual.widgets import SelectionList
+
+    async def t():
+        app = make_app(_todos())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            opts = app.screen.query_one("#planp-list", SelectionList)
+            opts.deselect(1)
+            await pilot.press("escape")
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ != "PlanProposalScreen"
+            by_id = {t.id: t for t in app.todos}
+            assert all(t.planned_for == "" for t in by_id.values())
+            assert all((t.plan_skip or "") == "" for t in by_id.values())
+
+    asyncio.run(t())
+
+
+def test_buongiorno_layout_terminale_piccolo(tmp_files):
+    """Cornice fissa: Chiudi dentro il box anche a 80x24 e 70x20."""
+    from textual.widgets import Button
+
+    async def _once(w, h):
+        app = make_app(_todos())
+        async with app.run_test(size=(w, h)) as pilot:
+            await pilot.pause()
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "PlanProposalScreen"
+            box = app.screen.query_one("#planp-box").region
+            btn = app.screen.query_one("#planp-close", Button).region
+            assert btn.y >= box.y and btn.y + btn.height <= box.y + box.height
+            assert btn.x >= box.x and btn.x + btn.width <= box.x + box.width
+
+    async def t():
+        for w, h in ((80, 24), (70, 20)):
+            await _once(w, h)
+
+    asyncio.run(t())
+
+
 def test_buongiorno_prima_voce_giornata(tmp_files):
     from src.lang import T as _T
 

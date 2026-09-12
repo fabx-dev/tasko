@@ -202,6 +202,10 @@ Regole dure:
   `menu_brief_*`, `brief_m_title/empty/sec_top/hint`;
   `tests/test_plan_ui.py` (+2), `test_briefing.py` riscritto sera-only,
   `test_review.py` (+layout piccolo).
+- **Buongiorno UX fix**: riga `planp_additive` (solo aggiunge, N restano, Esc non
+  scrive), summary con già-pianificati, flag con `—`, notify con aggiunti/
+  presenti/rimandati, fix stato vuoto mai mostrato, contenuto in scroll con
+  legend+bottoni fissi (test layout 80x24/70x20); test Esc-no-write + DB vuoto.
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 

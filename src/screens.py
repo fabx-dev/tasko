@@ -2630,8 +2630,16 @@ class PlanProposalScreen(ModalScreen[None]):
         height: auto;
         margin-bottom: 1;
     }
-    #planp-list {
+    #planp-additive {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #planp-scroll {
         height: 1fr;
+        margin-bottom: 1;
+    }
+    #planp-list {
+        height: auto;
         margin-bottom: 1;
     }
     #planp-summary {
@@ -2640,7 +2648,6 @@ class PlanProposalScreen(ModalScreen[None]):
     }
     #planp-legend {
         height: auto;
-        margin-top: 1;
     }
     #planp-buttons {
         width: 100%;
@@ -2712,7 +2719,7 @@ class PlanProposalScreen(ModalScreen[None]):
         # Niente #id in coda: gli id interni restano nel value, cosi' i motivi
         # (il vero contenuto della riga) non vengono troncati dal terminale.
         flags = "".join(
-            f" ({T(k)})"
+            f" — {T(k)}"
             for k in ("plan_cut", "plan_skipped")
             if any(k == kk for kk, _p in reasons)
         )
@@ -2769,28 +2776,36 @@ class PlanProposalScreen(ModalScreen[None]):
                 f"[b]{T('planp_title', date=_format_date_it(self.today))}[/b]",
                 id="planp-title",
             )
-            ctx = self._context_lines()
-            if ctx:
-                yield Static("\n".join(ctx), id="planp-context")
-            n_in = sum(1 for _i, _s, r in self.plan if self._preselected(r))
-            yield Static(
-                T("planp_summary", n=n_in, c=len(self.plan) - n_in, h=int(self.hours)),
-                id="planp-summary",
-            )
-            if self.plan:
-                yield SelectionList(
-                    *[
-                        (
-                            self._option_label(t_id, reasons),
-                            t_id,
-                            self._preselected(reasons),
-                        )
-                        for t_id, _score, reasons in self.plan
-                    ],
-                    id="planp-list",
+            yield Static(T("planp_additive", m=self.n_planned), id="planp-additive")
+            with VerticalScroll(id="planp-scroll"):
+                ctx = self._context_lines()
+                if ctx:
+                    yield Static("\n".join(ctx), id="planp-context")
+                n_in = sum(1 for _i, _s, r in self.plan if self._preselected(r))
+                yield Static(
+                    T(
+                        "planp_summary",
+                        n=n_in,
+                        m=self.n_planned,
+                        c=len(self.plan) - n_in,
+                        h=int(self.hours),
+                    ),
+                    id="planp-summary",
                 )
-            elif self.n_planned or any(t.state == "attivo" for t in self.all_todos):
-                yield Static(T("planp_done" if self.n_planned else "planp_empty"))
+                if self.plan:
+                    yield SelectionList(
+                        *[
+                            (
+                                self._option_label(t_id, reasons),
+                                t_id,
+                                self._preselected(reasons),
+                            )
+                            for t_id, _score, reasons in self.plan
+                        ],
+                        id="planp-list",
+                    )
+                else:
+                    yield Static(T("planp_done" if self.n_planned else "planp_empty"))
             yield Static(T("rev_legend"), id="planp-legend")
             with Horizontal(id="planp-buttons"):
                 yield Button(T("form_save"), id="planp-confirm", variant="default")
@@ -2827,6 +2842,7 @@ class PlanProposalScreen(ModalScreen[None]):
         # Solo additivo: aggiunge i selezionati, non toglie mai i pianificati.
         selected = self._selected_ids()
         n = 0
+        r = 0
         for t in self.all_todos:
             if t.state != "attivo":
                 continue
@@ -2835,9 +2851,11 @@ class PlanProposalScreen(ModalScreen[None]):
                 t.plan_skip = ""
                 n += 1
             elif t.planned_for != self.today:
+                if t.plan_skip != self.today:
+                    r += 1
                 t.plan_skip = self.today
         self.on_change()
-        self.notify(T("n_planp_saved", n=n))
+        self.notify(T("n_planp_saved", n=n, k=self.n_planned, r=r))
         self.dismiss()
 
 
