@@ -230,6 +230,24 @@ Regole dure:
   shortcut nuovi), stampa senza hint, empty mai-pianificato vs svuotato;
   chiavi `rev_additive/brief_goto/brief_e_left_never`; niente fusione
   (intenti distinti: celebrare oggi vs decidere domani).
+- **Refactor Fase 1/2 (fatti)**:
+  - Quick win: stringhe tabella i18n (`col_id/col_tags/table_empty`), `clear_filters`
+    resetta anche `config["filter_state"]` + salva, `StatsScreen.TIME_SLOTS` da
+    attributo a property (i18n a runtime), rimosso `TEMPLATES` morto, `load_templates`
+    usa `_default_templates()`, `load_config` riusa `_clamp_int`; test: via check su
+    `~` hardcodato, sleep reali rimosse (fake `datetime` + attesa a condizione),
+    helper `run`/`wait_for` in conftest.
+  - Convenzioni nuove (da rispettare): le action che mutano+salvano usano
+    `_commit_refresh(chiave_notify, **params)` invece della tripletta
+    save+refresh+notify; le screen di pianificazione ricevono `self._on_plan_changed`
+    (non closure duplicate); screen modali con `action_close` = solo `dismiss()`:
+    usare `CloseMixin` (le screen tengono i propri BINDINGS); righe bottone a
+    `width:1fr; min-width:14; height:3; margin:0 1` → `classes="btn-row"` (regola
+    condivisa in `TodoApp.CSS`), le varianti specifiche (form/confirm/brief/pomo/sec)
+    restano per-screen. Lezione: non mettere bottoni-pair (es. `#planp-close`) nel
+    gruppo close full-width — la regola id batte `.btn-row` e allarga il bottone.
+  - Aggregatori condivisi: `_completed_by_date`/`_pomodoros_by_date` come helper di
+    modulo; Review/Briefing/Stats non reimplementano più streak/done/pomo per giorno.
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 
