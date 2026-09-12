@@ -258,11 +258,6 @@ class TodoApp(App):
     Footer {
         padding-left: 1;
     }
-    /* Voce palette nel footer (tasto m): chiave rossa + hamburger. */
-    FooterKey.-command-palette > .footer-key--key {
-        color: $text;
-        background: $error;
-    }
     /* Shell modali condivisa: stesse regole di prima, un solo punto.
        (Dichiarazioni spostate dalle 27 screen: root, box, titoli, chiudi.) */
     ModalScreen {
@@ -334,14 +329,14 @@ class TodoApp(App):
         Binding(
             "ctrl+p",
             "command_palette",
-            T("b_menu"),
+            T("b_palette"),
             show=False,
-            tooltip=T("menu_tooltip"),
+            tooltip=T("palette_tooltip"),
         ),
-        Binding("m", "open_menu", T("b_menu"), show=False, tooltip=T("menu_tooltip")),
+        Binding("m", "open_menu", T("b_menu"), show=True, tooltip=T("menu_tooltip")),
     ]
 
-    COMMAND_PALETTE_BINDING = "m"
+    COMMAND_PALETTE_BINDING = "ctrl+p"
 
     COMMANDS = App.COMMANDS | {TaskoMenuProvider}
 
@@ -489,7 +484,7 @@ class TodoApp(App):
         yield Static("", id="pomodoro-bar", classes="hidden")
         yield Static(self._stats_text(), id="stats-bar")
         yield Static(self._help_text(), id="help-panel", classes="hidden")
-        yield Footer()
+        yield Footer(show_command_palette=False)
 
     def on_mount(self) -> None:
         table = self.query_one("#todo-table", DataTable)

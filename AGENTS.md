@@ -157,8 +157,9 @@ Regole dure:
   tutto allineato a sinistra, righe compatte titolo+aiuto; click/Enter apre,
   Enter entra sempre, nuovo click = toggle; frecce + 1-4 + type-to-filter,
   esc a stadi filtro/sottomenu/menu),
-  `ctrl+p` resta palette (`TaskoMenuProvider`, titoli "Categoria › Voce");
-  menu completo anche delle azioni con tasto; `tests/test_menu.py`.
+  `ctrl+p` resta palette (`TaskoMenuProvider`, titoli "Categoria › Voce") ma è
+  nascosto dal footer (`Footer(show_command_palette=False)`); nel footer si mostra
+  solo `m` come `☰ Menu`; menu completo anche delle azioni con tasto; `tests/test_menu.py`.
   Lezioni: righe come `MenuRow` (Label focusable), non Button — il Click del
   mouse (on_click sulla riga) e l'Enter (binding activate) restano
   distinguibili (Button.Pressed li confonde) e niente debounce -active;
