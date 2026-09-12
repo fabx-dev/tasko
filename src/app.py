@@ -493,11 +493,11 @@ class TodoApp(App):
     def on_mount(self) -> None:
         table = self.query_one("#todo-table", DataTable)
         table.add_columns(
-            "ID",
+            T("col_id"),
             T("col_state"),
             T("col_title"),
             T("col_proj"),
-            "Tags",
+            T("col_tags"),
             T("col_notes"),
             T("col_prio"),
             T("col_recur"),
@@ -695,7 +695,7 @@ class TodoApp(App):
             table.add_row(
                 "-",
                 "-",
-                "Nessun task — premi 'n' per crearne uno",
+                T("table_empty"),
                 "-",
                 "-",
                 "-",
