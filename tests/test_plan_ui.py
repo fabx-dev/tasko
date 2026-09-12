@@ -271,7 +271,7 @@ def test_buongiorno_db_vuoto_mostra_messaggio(tmp_files):
             assert type(app.screen).__name__ == "PlanProposalScreen"
             txt = screen_texts(app.screen)
             assert _T("planp_empty") in txt
-            assert _T("planp_additive", m=0) in txt
+            assert _T("planp_additive") in txt
 
     asyncio.run(t())
 

@@ -2776,7 +2776,7 @@ class PlanProposalScreen(ModalScreen[None]):
                 f"[b]{T('planp_title', date=_format_date_it(self.today))}[/b]",
                 id="planp-title",
             )
-            yield Static(T("planp_additive", m=self.n_planned), id="planp-additive")
+            yield Static(T("planp_additive"), id="planp-additive")
             with VerticalScroll(id="planp-scroll"):
                 ctx = self._context_lines()
                 if ctx:
