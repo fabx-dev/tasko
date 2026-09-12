@@ -1929,18 +1929,6 @@ class DetailScreen(ModalScreen[str | None]):
         height: auto;
         max-height: 15;
     }
-    #detail-close {
-        margin-top: 1;
-        width: 1fr;
-        min-width: 16;
-        height: 3;
-    }
-    #detail-edit {
-        margin-top: 1;
-        width: 1fr;
-        min-width: 16;
-        height: 3;
-    }
     #detail-buttons {
         width: 100%;
         height: auto;
