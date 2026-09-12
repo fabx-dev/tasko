@@ -1098,6 +1098,8 @@ class TodoApp(App):
         self.filter_tag = None
         self.filter_project = None
         self.filter_search = ""
+        self.config["filter_state"] = None
+        self._save_config()
         self._populate_table()
         self.notify(T("n_filters_clear"))
 

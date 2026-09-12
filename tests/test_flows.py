@@ -207,6 +207,22 @@ def test_ricerca_e_filtri(tmp_files):
     run(t())
 
 
+def test_clear_filters_resetta_anche_config(tmp_files):
+    async def t():
+        app = make_app([make_todo("A")])
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_filter_todos()
+            assert app.filter_state == "in_sospeso"
+            assert app.config["filter_state"] == "in_sospeso"
+            app.action_clear_filters()
+            assert app.filter_state is None
+            assert app.config["filter_state"] is None
+            assert m.load_config().get("filter_state") is None
+
+    run(t())
+
+
 def test_stats_conteggi_e_streak(tmp_files):
     async def t():
         today = datetime.now().date()
