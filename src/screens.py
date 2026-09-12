@@ -138,6 +138,26 @@ def _streak_days(by_date: dict[str, int], today: str) -> int:
     return streak
 
 
+def _completed_by_date(todos: list[TodoItem]) -> dict[str, int]:
+    """Completati per giorno (chiave YYYY-MM-DD)."""
+    result: dict[str, int] = {}
+    for t in todos:
+        if t.completed_at:
+            day = t.completed_at[:10]
+            result[day] = result.get(day, 0) + 1
+    return result
+
+
+def _pomodoros_by_date(todos: list[TodoItem]) -> dict[str, int]:
+    """Pomodori per giorno (chiave YYYY-MM-DD)."""
+    result: dict[str, int] = {}
+    for t in todos:
+        for ts in getattr(t, "pomodoro_log", []) or []:
+            day = str(ts)[:10]
+            result[day] = result.get(day, 0) + 1
+    return result
+
+
 class TodoFormScreen(ModalScreen[dict | None]):
     """Modal screen to add or edit a todo item."""
 
@@ -2567,21 +2587,6 @@ class ReviewScreen(ModalScreen[None]):
         except ValueError:
             self.tomorrow = self.today
 
-    def _done_today(self) -> list[TodoItem]:
-        return [
-            t
-            for t in self.all_todos
-            if t.done and (t.completed_at or "")[:10] == self.today
-        ]
-
-    def _pomo_today(self) -> int:
-        return sum(
-            1
-            for t in self.all_todos
-            for ts in (t.pomodoro_log or [])
-            if ts[:10] == self.today
-        )
-
     def _is_overdue(self, t: TodoItem) -> bool:
         due = _due_date_part(t.due)
         return bool(due) and due < self.today
@@ -2614,7 +2619,7 @@ class ReviewScreen(ModalScreen[None]):
             )
             yield Static(T("rev_additive"), id="rev-additive")
             with VerticalScroll(id="rev-scroll"):
-                done = self._done_today()
+                done = _done_on_day(self.all_todos, self.today)
                 yield Static(self._summary_text(len(done)), id="rev-summary")
                 yield Label(T("rev_cand", date=_format_date_it(self.tomorrow)))
                 cands = self._candidates()
@@ -2635,7 +2640,12 @@ class ReviewScreen(ModalScreen[None]):
 
     def _summary_text(self, n_done: int) -> str:
         goal_txt = T("rev_goal", n=self.daily_goal) if self.daily_goal > 0 else ""
-        return T("rev_summary", done=n_done, goal=goal_txt, pomo=self._pomo_today())
+        return T(
+            "rev_summary",
+            done=n_done,
+            goal=goal_txt,
+            pomo=_pomo_on_day(self.all_todos, self.today),
+        )
 
     def on_mount(self) -> None:
         try:
@@ -2987,17 +2997,6 @@ class BriefingScreen(ModalScreen[str | None]):
             self.daily_goal = 0
         self.on_print = on_print
 
-    def _by_date(self) -> dict[str, int]:
-        result: dict[str, int] = {}
-        for t in self.all_todos:
-            if t.completed_at:
-                day = t.completed_at[:10]
-                result[day] = result.get(day, 0) + 1
-        return result
-
-    def _streak(self, by_date: dict[str, int]) -> int:
-        return _streak_days(by_date, self.today)
-
     def _done_on(self, day: str) -> list[TodoItem]:
         return _done_on_day(self.all_todos, day)
 
@@ -3019,7 +3018,7 @@ class BriefingScreen(ModalScreen[str | None]):
         else:
             count = f"{len(done)} · {pomo} 🍅"
         lines = [T("brief_e_sec_done"), f"  {count}"]
-        streak = self._streak(self._by_date())
+        streak = _streak_days(_completed_by_date(self.all_todos), self.today)
         streak_txt = (
             T("stats_serie", n=streak) if streak else T("stats_serie_off")
         ).lstrip()
@@ -3235,20 +3234,10 @@ class StatsScreen(ModalScreen[None]):
     STATS_SPAN = 14
 
     def _completed_by_date(self) -> dict[str, int]:
-        result: dict[str, int] = {}
-        for t in self.all_todos:
-            if t.completed_at:
-                date_str = t.completed_at[:10]
-                result[date_str] = result.get(date_str, 0) + 1
-        return result
+        return _completed_by_date(self.all_todos)
 
     def _pomodoros_by_date(self) -> dict[str, int]:
-        result: dict[str, int] = {}
-        for t in self.all_todos:
-            for ts in getattr(t, "pomodoro_log", []) or []:
-                date_str = str(ts)[:10]
-                result[date_str] = result.get(date_str, 0) + 1
-        return result
+        return _pomodoros_by_date(self.all_todos)
 
     def _count_in_range(
         self, start: datetime.date, end: datetime.date, by_date: dict[str, int]
@@ -3358,17 +3347,8 @@ class StatsScreen(ModalScreen[None]):
 
     def _streak(self, by_date: dict[str, int]) -> int:
         """Giorni consecutivi con >=1 completamento (oggi o da ieri se oggi e' a zero)."""
-        today = datetime.now().date()
-        d = (
-            today
-            if by_date.get(today.strftime("%Y-%m-%d"), 0) > 0
-            else today - timedelta(days=1)
-        )
-        streak = 0
-        while by_date.get(d.strftime("%Y-%m-%d"), 0) > 0:
-            streak += 1
-            d -= timedelta(days=1)
-        return streak
+        today = datetime.now().date().strftime("%Y-%m-%d")
+        return _streak_days(by_date, today)
 
     def _goal_streaks(self, by_date: dict[str, int]) -> dict:
         """Streak attuali e massime vs obiettivi giornaliero/settimanale."""
