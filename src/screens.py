@@ -158,6 +158,13 @@ def _pomodoros_by_date(todos: list[TodoItem]) -> dict[str, int]:
     return result
 
 
+class CloseMixin:
+    """Chiusura via escape condivisa (le screen tengono i propri BINDINGS)."""
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+
 class TodoFormScreen(ModalScreen[dict | None]):
     """Modal screen to add or edit a todo item."""
 
@@ -517,7 +524,7 @@ class TodoFormScreen(ModalScreen[dict | None]):
         )
 
 
-class NLHelpScreen(ModalScreen[None]):
+class NLHelpScreen(CloseMixin, ModalScreen[None]):
     """Foglio esempi per l'inserimento in linguaggio naturale."""
 
     CSS = """
@@ -570,9 +577,6 @@ class NLHelpScreen(ModalScreen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "nlh-close":
             self.dismiss()
-
-    def action_close(self) -> None:
-        self.dismiss()
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -887,12 +891,6 @@ class SearchScreen(ModalScreen[str | None]):
         width: 100%;
         height: 3;
     }
-    #search-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
-    }
     """
 
     BINDINGS = [Binding("escape", "cancel", "Annulla")]
@@ -907,7 +905,7 @@ class SearchScreen(ModalScreen[str | None]):
             yield Input(
                 value=self.current, placeholder=T("search_ph"), id="search-input"
             )
-            with Horizontal(id="search-buttons"):
+            with Horizontal(id="search-buttons", classes="btn-row"):
                 yield Button(T("b_search"), id="ok-btn", variant="default")
                 yield Button(T("search_clear"), id="clear-btn", variant="default")
 
@@ -934,7 +932,7 @@ class SearchScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
 
-class AgendaScreen(ModalScreen[None]):
+class AgendaScreen(CloseMixin, ModalScreen[None]):
     """Radar cronologico: scaduti, oggi, domani, prossimi 7 giorni."""
 
     CSS = """
@@ -1031,11 +1029,8 @@ class AgendaScreen(ModalScreen[None]):
         if event.button.id == "agenda-close":
             self.dismiss()
 
-    def action_close(self) -> None:
-        self.dismiss()
 
-
-class WorkflowScreen(ModalScreen[None]):
+class WorkflowScreen(CloseMixin, ModalScreen[None]):
     """Guida operativa breve: come usare Tasko nel ciclo quotidiano."""
 
     CSS = """
@@ -1088,11 +1083,8 @@ class WorkflowScreen(ModalScreen[None]):
         if event.button.id == "workflow-close":
             self.dismiss()
 
-    def action_close(self) -> None:
-        self.dismiss()
 
-
-class WeekScreen(ModalScreen[None]):
+class WeekScreen(CloseMixin, ModalScreen[None]):
     """Vista settimana Lun-Dom."""
 
     CSS = """
@@ -1193,9 +1185,6 @@ class WeekScreen(ModalScreen[None]):
         elif event.button.id == "next-btn":
             self.monday += timedelta(days=7)
             self.refresh(recompose=True)
-
-    def action_close(self) -> None:
-        self.dismiss()
 
 
 class TemplateScreen(ModalScreen[tuple | None]):
@@ -1378,12 +1367,6 @@ class TemplateCreateScreen(ModalScreen[dict | None]):
         dock: bottom;
         margin-top: 1;
     }
-    #tplc-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
-    }
     """
 
     BINDINGS = [
@@ -1412,7 +1395,7 @@ class TemplateCreateScreen(ModalScreen[dict | None]):
                 )
                 yield Label(T("tplc_tasks"))
                 yield TextArea("", id="tplc-tasks")
-            with Horizontal(id="tplc-buttons"):
+            with Horizontal(id="tplc-buttons", classes="btn-row"):
                 yield Button(T("form_save"), id="tplc-save", variant="default")
                 yield Button(T("form_cancel"), id="tplc-cancel", variant="default")
 
@@ -1558,12 +1541,6 @@ class ImportCsvScreen(ModalScreen[str | None]):
         width: 100%;
         height: 3;
     }
-    #impcsv-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
-    }
     """
 
     BINDINGS = [
@@ -1586,7 +1563,7 @@ class ImportCsvScreen(ModalScreen[str | None]):
                     yield Button(f"{p.name}", id=f"impcsv-{i}", variant="default")
             yield Label(T("imp_path"))
             yield Input(placeholder=T("imp_path_ph"), id="impcsv-path")
-            with Horizontal(id="impcsv-buttons"):
+            with Horizontal(id="impcsv-buttons", classes="btn-row"):
                 yield Button(T("imp_ok"), id="impcsv-ok", variant="default")
                 yield Button(T("form_cancel"), id="impcsv-cancel", variant="default")
 
@@ -1626,7 +1603,7 @@ class ImportCsvScreen(ModalScreen[str | None]):
         self.dismiss(path)
 
 
-class PomodoroScreen(ModalScreen[None]):
+class PomodoroScreen(CloseMixin, ModalScreen[None]):
     """Timer pomodoro con durata impostabile, pausa/riprendi, live countdown."""
 
     CSS = """
@@ -1803,9 +1780,6 @@ class PomodoroScreen(ModalScreen[None]):
             self.on_set_duration(minutes)
             self._refresh()
 
-    def action_close(self) -> None:
-        self.dismiss()
-
     def action_pause_resume(self) -> None:
         self.on_pause_resume()
         self._refresh()
@@ -1836,7 +1810,7 @@ class PomodoroScreen(ModalScreen[None]):
         self._refresh()
 
 
-class KanbanScreen(ModalScreen[None]):
+class KanbanScreen(CloseMixin, ModalScreen[None]):
     """Board kanban Attivo / Sospeso / Completato."""
 
     CSS = """
@@ -1925,9 +1899,6 @@ class KanbanScreen(ModalScreen[None]):
         except Exception:
             pass
 
-    def action_close(self) -> None:
-        self.dismiss()
-
 
 class DetailScreen(ModalScreen[str | None]):
     """Screen to show todo details including notes and subtasks."""
@@ -1974,12 +1945,6 @@ class DetailScreen(ModalScreen[str | None]):
         width: 100%;
         height: auto;
         margin-top: 1;
-    }
-    #detail-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
     }
     """
 
@@ -2060,7 +2025,7 @@ class DetailScreen(ModalScreen[str | None]):
                         yield Static(display)
             else:
                 yield Label(T("detail_nosubs"), id="detail-subtasks-label")
-            with Horizontal(id="detail-buttons"):
+            with Horizontal(id="detail-buttons", classes="btn-row"):
                 yield Button(T("detail_edit"), id="detail-edit", variant="default")
                 yield Button(T("ui_close_esc"), id="detail-close", variant="default")
 
@@ -2084,7 +2049,7 @@ class DetailScreen(ModalScreen[str | None]):
         self.dismiss("edit")
 
 
-class DayScreen(ModalScreen[None]):
+class DayScreen(CloseMixin, ModalScreen[None]):
     """Screen showing the todos due on a specific day."""
 
     CSS = """
@@ -2142,11 +2107,8 @@ class DayScreen(ModalScreen[None]):
         except Exception:
             pass
 
-    def action_close(self) -> None:
-        self.dismiss()
 
-
-class CalendarScreen(ModalScreen[None]):
+class CalendarScreen(CloseMixin, ModalScreen[None]):
     """Screen to show todos on a monthly calendar grid."""
 
     CSS = """
@@ -2308,11 +2270,8 @@ class CalendarScreen(ModalScreen[None]):
         except Exception:
             pass
 
-    def action_close(self) -> None:
-        self.dismiss()
 
-
-class DailyPlanScreen(ModalScreen[None]):
+class DailyPlanScreen(CloseMixin, ModalScreen[None]):
     """Screen showing today's planned tasks with quick add/remove."""
 
     CSS = """
@@ -2513,11 +2472,8 @@ class DailyPlanScreen(ModalScreen[None]):
                 return
         self.notify(T("n_plan_susp_none"), severity="warning")
 
-    def action_close(self) -> None:
-        self.dismiss()
 
-
-class ReviewScreen(ModalScreen[None]):
+class ReviewScreen(CloseMixin, ModalScreen[None]):
     """Chiusura giornata: riepilogo di oggi + scelta del piano di domani."""
 
     CSS = """
@@ -2550,12 +2506,6 @@ class ReviewScreen(ModalScreen[None]):
         width: 100%;
         height: 3;
         margin-top: 1;
-    }
-    #rev-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
     }
     """
 
@@ -2634,7 +2584,7 @@ class ReviewScreen(ModalScreen[None]):
                 else:
                     yield Static(T("rev_empty_cand"))
             yield Static(T("rev_legend"), id="rev-legend")
-            with Horizontal(id="rev-buttons"):
+            with Horizontal(id="rev-buttons", classes="btn-row"):
                 yield Button(T("form_save"), id="rev-confirm", variant="default")
                 yield Button(T("form_cancel"), id="rev-close", variant="default")
 
@@ -2661,9 +2611,6 @@ class ReviewScreen(ModalScreen[None]):
             self.dismiss()
         elif event.button.id == "rev-confirm":
             self._confirm()
-
-    def action_close(self) -> None:
-        self.dismiss()
 
     def action_confirm(self) -> None:
         self._confirm()
@@ -2692,7 +2639,7 @@ class ReviewScreen(ModalScreen[None]):
         self.dismiss()
 
 
-class PlanProposalScreen(ModalScreen[None]):
+class PlanProposalScreen(CloseMixin, ModalScreen[None]):
     """Buongiorno: contesto di oggi + proposta da confermare (scrive planned_for)."""
 
     CSS = """
@@ -2728,12 +2675,6 @@ class PlanProposalScreen(ModalScreen[None]):
         width: 100%;
         height: 3;
         margin-top: 1;
-    }
-    #planp-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
     }
     """
 
@@ -2882,7 +2823,7 @@ class PlanProposalScreen(ModalScreen[None]):
                 else:
                     yield Static(T("planp_done" if self.n_planned else "planp_empty"))
             yield Static(T("rev_legend"), id="planp-legend")
-            with Horizontal(id="planp-buttons"):
+            with Horizontal(id="planp-buttons", classes="btn-row"):
                 yield Button(T("form_save"), id="planp-confirm", variant="default")
                 yield Button(T("form_cancel"), id="planp-close", variant="default")
 
@@ -2900,9 +2841,6 @@ class PlanProposalScreen(ModalScreen[None]):
             self.dismiss()
         elif event.button.id == "planp-confirm":
             self._confirm()
-
-    def action_close(self) -> None:
-        self.dismiss()
 
     def action_confirm(self) -> None:
         self._confirm()
@@ -2934,7 +2872,7 @@ class PlanProposalScreen(ModalScreen[None]):
         self.dismiss()
 
 
-class BriefingScreen(ModalScreen[str | None]):
+class BriefingScreen(CloseMixin, ModalScreen[str | None]):
     """Resoconto sera: solo composizione di dati esistenti (zero rete)."""
 
     CSS = """
@@ -3068,9 +3006,6 @@ class BriefingScreen(ModalScreen[str | None]):
         elif event.button.id == "brief-goto":
             self.dismiss("review")
 
-    def action_close(self) -> None:
-        self.dismiss()
-
     def action_print_brief(self) -> None:
         self._print()
 
@@ -3115,12 +3050,6 @@ class GoalsScreen(ModalScreen[dict | None]):
         height: 3;
         margin-top: 1;
     }
-    #goals-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
-    }
     """
 
     BINDINGS = [
@@ -3145,7 +3074,7 @@ class GoalsScreen(ModalScreen[dict | None]):
             yield Input(str(self.weekly), id="goals-weekly")
             yield Label(T("goals_pomo"))
             yield Input(str(self.pomo_daily), id="goals-pomo")
-            with Horizontal(id="goals-buttons"):
+            with Horizontal(id="goals-buttons", classes="btn-row"):
                 yield Button(T("form_save"), id="goals-save", variant="default")
                 yield Button(T("form_cancel"), id="goals-cancel", variant="default")
 
@@ -3184,7 +3113,7 @@ class GoalsScreen(ModalScreen[dict | None]):
         self.dismiss({"daily": daily, "weekly": weekly, "pomo_daily": pomo})
 
 
-class StatsScreen(ModalScreen[None]):
+class StatsScreen(CloseMixin, ModalScreen[None]):
     """Screen to show productivity statistics."""
 
     CSS = """
@@ -3648,11 +3577,8 @@ class StatsScreen(ModalScreen[None]):
         except Exception:
             pass
 
-    def action_close(self) -> None:
-        self.dismiss()
 
-
-class KeysScreen(ModalScreen[None]):
+class KeysScreen(CloseMixin, ModalScreen[None]):
     """Popup con tutte le combinazioni di tasti (voce Tasti del menu)."""
 
     CSS = """
@@ -3690,9 +3616,6 @@ class KeysScreen(ModalScreen[None]):
         except Exception:
             pass
 
-    def action_close(self) -> None:
-        self.dismiss()
-
 
 class SettingsScreen(ModalScreen[dict | None]):
     """Impostazioni app: tema, vista, obiettivi, durate pomodoro."""
@@ -3719,12 +3642,6 @@ class SettingsScreen(ModalScreen[dict | None]):
         height: 3;
         dock: bottom;
         margin-top: 1;
-    }
-    #set-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
     }
     """
 
@@ -3805,7 +3722,7 @@ class SettingsScreen(ModalScreen[dict | None]):
                     value=bool(self.current.get("sounds", True)),
                     id="set-sounds",
                 )
-            with Horizontal(id="set-buttons"):
+            with Horizontal(id="set-buttons", classes="btn-row"):
                 yield Button(T("form_save"), id="set-save", variant="default")
                 yield Button(T("form_cancel"), id="set-cancel", variant="default")
 
@@ -4041,12 +3958,6 @@ class WelcomeScreen(ModalScreen[str | None]):
         width: 100%;
         height: 3;
     }
-    #wel-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
-    }
     """
 
     BINDINGS = [Binding("escape", "empty", "Vuoto")]
@@ -4055,7 +3966,7 @@ class WelcomeScreen(ModalScreen[str | None]):
         with Vertical(id="wel-box"):
             yield Label(T("welcome_title"), id="wel-title")
             yield Label(T("welcome_body"), id="wel-body")
-            with Horizontal(id="wel-buttons"):
+            with Horizontal(id="wel-buttons", classes="btn-row"):
                 yield Button(T("welcome_demo"), id="wel-demo", variant="default")
                 yield Button(T("welcome_empty"), id="wel-empty", variant="default")
 
@@ -4107,12 +4018,6 @@ class LockScreen(ModalScreen[bool]):
         width: 100%;
         height: 3;
     }
-    #lock-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
-    }
     """
 
     BINDINGS = [Binding("escape", "abort", "Esci")]
@@ -4122,7 +4027,7 @@ class LockScreen(ModalScreen[bool]):
             yield Label("[b]🔒 Tasko protetto[/b]", id="lock-title")
             yield Label(T("lock_hint"), id="lock-hint")
             yield Input(placeholder="Password", password=True, id="lock-pw")
-            with Horizontal(id="lock-buttons"):
+            with Horizontal(id="lock-buttons", classes="btn-row"):
                 yield Button(T("lock_open"), id="lock-ok", variant="default")
                 yield Button(T("lock_exit"), id="lock-exit", variant="default")
 
@@ -4198,12 +4103,6 @@ class PasswordScreen(ModalScreen[list[str] | None]):
         height: 3;
         margin-top: 1;
     }
-    #pw-buttons Button {
-        width: 1fr;
-        min-width: 14;
-        height: 3;
-        margin: 0 1;
-    }
     """
 
     BINDINGS = [
@@ -4225,7 +4124,7 @@ class PasswordScreen(ModalScreen[list[str] | None]):
                 for i, label_key in enumerate(self.fields):
                     yield Label(T(label_key))
                     yield Input(password=True, id=f"pw-{i}")
-            with Horizontal(id="pw-buttons"):
+            with Horizontal(id="pw-buttons", classes="btn-row"):
                 yield Button(T("form_save"), id="pw-ok", variant="default")
                 yield Button(T("form_cancel"), id="pw-cancel", variant="default")
 
@@ -4342,7 +4241,7 @@ class SecurityScreen(ModalScreen[str | None]):
 # Soglie salute progetti (modificabili in un punto solo).
 
 
-class HealthScreen(ModalScreen[None]):
+class HealthScreen(CloseMixin, ModalScreen[None]):
     """Salute progetti: avanzamento, ritardi, momentum, verdetto."""
 
     CSS = """
@@ -4466,9 +4365,6 @@ class HealthScreen(ModalScreen[None]):
             self.query_one("#hea-close", Button).focus()
         except Exception:
             pass
-
-    def action_close(self) -> None:
-        self.dismiss()
 
 
 class MenuRow(Label):

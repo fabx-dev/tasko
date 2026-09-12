@@ -292,10 +292,17 @@ class TodoApp(App):
         margin-top: 1;
     }
     #agenda-close, #week-close, #tplp-close, #keys-close, #rst-close, #hea-close,
-    #workflow-close, #brief-close, #planp-close {
+    #workflow-close, #brief-close {
         width: 100%;
         min-width: 16;
         height: 3;
+    }
+    /* Righe bottone condivise (le screen con misure specifiche sovrascrivono). */
+    .btn-row Button {
+        width: 1fr;
+        min-width: 14;
+        height: 3;
+        margin: 0 1;
     }
     """
 
