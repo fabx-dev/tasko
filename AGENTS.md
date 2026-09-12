@@ -96,6 +96,9 @@ Regole dure:
 - **Mai crash da UI**: except ampi intenzionali (ruff esclude BLE/S110/S112 di proposito).
 - Date wall-time `"YYYY-MM-DD [HH:MM]"` (niente aware — romperebbe i dati, ruff esclude DTZ).
 - `ruff check` **E** `ruff format --check` (la CI li corre entrambi + pytest su 3.12 e 3.13).
+- Prima di ogni commit puoi lanciare `@reviewer`: subagente read-only in
+  `.opencode/agents/reviewer.md` che controlla diff contro queste convenzioni
+  + ruff + pytest, e chiude con `OK per il commit` o elenco bloccanti.
 
 ## 5. Verifica (obbligatoria prima di dire "fatto")
 
