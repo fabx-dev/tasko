@@ -5,6 +5,17 @@ Entries in English from now on.
 
 ## [Unreleased]
 
+### Added
+- Unified morning view ("Buongiorno", key `P`): today context (counts, load, yesterday, streak) plus the smart proposal with inline reasons, confirm and Markdown print in a single screen
+
+### Fixed
+- Removed dead morning briefing / smart plan duplication (single `plan_day` call, no fake `P`/`m` hints in modals)
+- Evening report hint now states the real steps (close, then `R` for day closing)
+- Briefing and smart-plan popups use the shared modal frame; day closing uses the fixed-frame pattern (list no longer overflows on small terminals)
+
+### Removed
+- Morning-only briefing keys and menu entries (`menu_plan_*`, `menu_brief_*`, `brief_m_title/empty/sec_top/hint`)
+
 ## [0.4.0] - 2026-09-12
 
 ### Added

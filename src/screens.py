@@ -77,6 +77,62 @@ def _agenda_due(todo: TodoItem) -> str:
     return f"({label} {time}) " if time else f"({label}) "
 
 
+_RICH_STYLE_TAGS = (
+    "b",
+    "/b",
+    "dim",
+    "/dim",
+    "green",
+    "red",
+    "cyan",
+    "yellow",
+    "bold",
+    "/bold",
+    "italic",
+    "/italic",
+    "underline",
+    "/underline",
+)
+
+
+def _strip_rich_tags(line: str) -> str:
+    """Toglie i tag di stile noti (il resto, es. [x] utente, resta intatto)."""
+    tags = "|".join(re.escape(t) for t in _RICH_STYLE_TAGS)
+    return re.sub(rf"\[({tags})\]", "", line).strip()
+
+
+def _hero_row(label: str, value: str) -> str:
+    """Riga statistica allineata: label puntinata a larghezza fissa."""
+    dots = "." * max(2, 16 - len(label))
+    return f"  {label} {dots} {value}"
+
+
+def _done_on_day(todos: list[TodoItem], day: str) -> list[TodoItem]:
+    return [t for t in todos if t.done and (t.completed_at or "")[:10] == day]
+
+
+def _pomo_on_day(todos: list[TodoItem], day: str) -> int:
+    return sum(1 for t in todos for ts in (t.pomodoro_log or []) if ts[:10] == day)
+
+
+def _streak_days(by_date: dict[str, int], today: str) -> int:
+    """Serie di giorni di fila con completati (vale da ieri se oggi e' a zero)."""
+    try:
+        today_d = datetime.strptime(today, "%Y-%m-%d").date()
+    except ValueError:
+        return 0
+    d = (
+        today_d
+        if by_date.get(today_d.strftime("%Y-%m-%d"), 0) > 0
+        else today_d - timedelta(days=1)
+    )
+    streak = 0
+    while by_date.get(d.strftime("%Y-%m-%d"), 0) > 0:
+        streak += 1
+        d -= timedelta(days=1)
+    return streak
+
+
 class TodoFormScreen(ModalScreen[dict | None]):
     """Modal screen to add or edit a todo item."""
 
@@ -2395,11 +2451,11 @@ class ReviewScreen(ModalScreen[None]):
     #rev-box {
         width: 100;
         max-width: 95%;
+        height: 90%;
         max-height: 90%;
     }
     #rev-list {
-        height: auto;
-        max-height: 16;
+        height: 1fr;
         margin-bottom: 1;
     }
     #rev-summary {
@@ -2562,13 +2618,17 @@ class ReviewScreen(ModalScreen[None]):
 
 
 class PlanProposalScreen(ModalScreen[None]):
-    """Piano smart: proposta ordinata da plan_day, conferma scrive planned_for=oggi."""
+    """Buongiorno: contesto di oggi + proposta da confermare (scrive planned_for)."""
 
     CSS = """
     #planp-box {
         width: 100;
         max-width: 95%;
         height: 90%;
+    }
+    #planp-context {
+        height: auto;
+        margin-bottom: 1;
     }
     #planp-list {
         height: 1fr;
@@ -2599,6 +2659,7 @@ class PlanProposalScreen(ModalScreen[None]):
         Binding("escape", "close", "Chiudi"),
         Binding("ctrl+enter", "confirm", "Conferma", show=False),
         Binding("s", "confirm", "Conferma", show=False),
+        Binding("p", "print_plan", "Stampa", show=False),
     ]
 
     def __init__(
@@ -2607,6 +2668,7 @@ class PlanProposalScreen(ModalScreen[None]):
         on_change,
         today: str | None = None,
         hours: float = 6.0,
+        on_print=None,
     ) -> None:
         super().__init__()
         self.all_todos = all_todos
@@ -2616,6 +2678,7 @@ class PlanProposalScreen(ModalScreen[None]):
             self.hours = max(1.0, float(hours))
         except (ValueError, TypeError):
             self.hours = 6.0
+        self.on_print = on_print
         self.plan = plan_day(self.all_todos, today=self.today, hours=self.hours)
         # Semantica additiva: i gia' pianificati non si ripropongono (per
         # togliere c'e' il piano giorno con x). Restano nel computo capacita'.
@@ -2656,12 +2719,60 @@ class PlanProposalScreen(ModalScreen[None]):
         )
         return f"{title}{extra}  #{t_id} ({why}){flags}"
 
+    def _context_lines(self) -> list[str]:
+        """Contesto di oggi (ex briefing mattina): conteggi, carico, ieri, serie."""
+        active = [t for t in self.all_todos if t.state == "attivo"]
+        if not active:
+            return []
+        planned = [t for t in active if t.planned_for == self.today]
+        due = [t for t in active if _due_date_part(t.due) == self.today]
+        overdue = [
+            t
+            for t in active
+            if _due_date_part(t.due) and _due_date_part(t.due) < self.today
+        ]
+        load = sum(int(t.stima_pomo or 0) for t in planned)
+        cap = int(self.hours / 0.5)
+        try:
+            yest = (
+                datetime.strptime(self.today, "%Y-%m-%d") - timedelta(days=1)
+            ).strftime("%Y-%m-%d")
+        except ValueError:
+            yest = self.today
+        lines = [
+            T("brief_m_sec_today"),
+            _hero_row(T("brief_k_plan"), str(len(planned))),
+            _hero_row(T("brief_k_due"), str(len(due))),
+            _hero_row(T("brief_k_over"), str(len(overdue))),
+            "  " + T("brief_m_load", s=load, c=cap, h=int(self.hours)),
+            "  "
+            + T(
+                "brief_m_yest",
+                d=len(_done_on_day(self.all_todos, yest)),
+                p=_pomo_on_day(self.all_todos, yest),
+            ),
+        ]
+        by_date: dict[str, int] = {}
+        for t in self.all_todos:
+            if t.completed_at:
+                day = t.completed_at[:10]
+                by_date[day] = by_date.get(day, 0) + 1
+        streak = _streak_days(by_date, self.today)
+        streak_txt = (
+            T("stats_serie", n=streak) if streak else T("stats_serie_off")
+        ).lstrip()
+        lines.append("  " + streak_txt)
+        return lines
+
     def compose(self) -> ComposeResult:
         with Vertical(id="planp-box"):
             yield Label(
                 f"[b]{T('planp_title', date=_format_date_it(self.today))}[/b]",
                 id="planp-title",
             )
+            ctx = self._context_lines()
+            if ctx:
+                yield Static("\n".join(ctx), id="planp-context")
             n_in = sum(1 for _i, _s, r in self.plan if self._preselected(r))
             yield Static(
                 T("planp_summary", n=n_in, c=len(self.plan) - n_in, h=int(self.hours)),
@@ -2684,6 +2795,7 @@ class PlanProposalScreen(ModalScreen[None]):
             yield Static(T("rev_legend"), id="planp-legend")
             with Horizontal(id="planp-buttons"):
                 yield Button(T("form_save"), id="planp-confirm", variant="default")
+                yield Button(T("brief_print"), id="planp-print", variant="default")
                 yield Button(T("form_cancel"), id="planp-close", variant="default")
 
     def on_mount(self) -> None:
@@ -2700,12 +2812,40 @@ class PlanProposalScreen(ModalScreen[None]):
             self.dismiss()
         elif event.button.id == "planp-confirm":
             self._confirm()
+        elif event.button.id == "planp-print":
+            self._print()
 
     def action_close(self) -> None:
         self.dismiss()
 
     def action_confirm(self) -> None:
         self._confirm()
+
+    def action_print_plan(self) -> None:
+        self._print()
+
+    def _print(self) -> None:
+        """Esporta contesto + proposta in Markdown (via callback dell'app)."""
+        if self.on_print is None:
+            return
+        text = "# " + T("planp_title", date=self.today) + "\n\n"
+        body = self._context_lines() + [
+            T(
+                "planp_summary",
+                n=sum(1 for _i, _s, r in self.plan if self._preselected(r)),
+                c=sum(1 for _i, _s, r in self.plan if not self._preselected(r)),
+                h=int(self.hours),
+            )
+        ]
+        for t_id, _score, reasons in self.plan:
+            body.append("  • " + self._option_label(t_id, reasons))
+        text += "\n".join(_strip_rich_tags(line) for line in body) + "\n"
+        try:
+            path = self.on_print("morning", self.today, text)
+        except Exception as exc:
+            self.notify(T("n_exp_err", e=exc), severity="error")
+            return
+        self.notify(T("n_brief_printed", p=path))
 
     def _selected_ids(self) -> set:
         try:
@@ -2732,7 +2872,7 @@ class PlanProposalScreen(ModalScreen[None]):
 
 
 class BriefingScreen(ModalScreen[None]):
-    """Briefing mattina / resoconto sera: solo composizione di dati esistenti."""
+    """Resoconto sera: solo composizione di dati esistenti (zero rete)."""
 
     CSS = """
     #brief-box {
@@ -2774,42 +2914,16 @@ class BriefingScreen(ModalScreen[None]):
         Binding("p", "print_brief", "Stampa", show=False),
     ]
 
-    # Tag di stile noti: gli unici rimossi nell'export (il resto, es. [x]
-    # nei titoli, e' contenuto utente e resta intatto).
-    _STYLE_TAGS = (
-        "b",
-        "/b",
-        "dim",
-        "/dim",
-        "green",
-        "red",
-        "cyan",
-        "yellow",
-        "bold",
-        "/bold",
-        "italic",
-        "/italic",
-        "underline",
-        "/underline",
-    )
-
     def __init__(
         self,
         all_todos: list[TodoItem],
-        mode: str = "morning",
         today: str | None = None,
-        hours: float = 6.0,
         daily_goal: int = 0,
         on_print=None,
     ) -> None:
         super().__init__()
         self.all_todos = all_todos
-        self.mode = "evening" if mode == "evening" else "morning"
         self.today = today or datetime.now().strftime("%Y-%m-%d")
-        try:
-            self.hours = max(1.0, float(hours))
-        except (ValueError, TypeError):
-            self.hours = 6.0
         try:
             self.daily_goal = max(0, int(daily_goal or 0))
         except (ValueError, TypeError):
@@ -2825,101 +2939,21 @@ class BriefingScreen(ModalScreen[None]):
         return result
 
     def _streak(self, by_date: dict[str, int]) -> int:
-        # Mirror di StatsScreen._streak (stessa regola: vale da ieri se oggi e' a zero).
-        try:
-            today_d = datetime.strptime(self.today, "%Y-%m-%d").date()
-        except ValueError:
-            return 0
-        d = (
-            today_d
-            if by_date.get(today_d.strftime("%Y-%m-%d"), 0) > 0
-            else today_d - timedelta(days=1)
-        )
-        streak = 0
-        while by_date.get(d.strftime("%Y-%m-%d"), 0) > 0:
-            streak += 1
-            d -= timedelta(days=1)
-        return streak
+        return _streak_days(by_date, self.today)
 
     def _done_on(self, day: str) -> list[TodoItem]:
-        return [
-            t for t in self.all_todos if t.done and (t.completed_at or "")[:10] == day
-        ]
+        return _done_on_day(self.all_todos, day)
 
     def _pomo_on(self, day: str) -> int:
-        return sum(
-            1 for t in self.all_todos for ts in (t.pomodoro_log or []) if ts[:10] == day
-        )
-
-    def _active(self) -> list[TodoItem]:
-        return [t for t in self.all_todos if t.state == "attivo"]
-
-    def _yesterday(self) -> str:
-        try:
-            return (
-                datetime.strptime(self.today, "%Y-%m-%d") - timedelta(days=1)
-            ).strftime("%Y-%m-%d")
-        except ValueError:
-            return self.today
-
-    @staticmethod
-    def _hero(label: str, value: str) -> str:
-        """Riga statistica allineata: label puntinata a larghezza fissa."""
-        dots = "." * max(2, 16 - len(label))
-        return f"  {label} {dots} {value}"
-
-    def _morning_lines(self) -> list[str]:
-        active = self._active()
-        if not active:
-            return [T("brief_m_empty")]
-        planned = [t for t in active if t.planned_for == self.today]
-        due = [t for t in active if _due_date_part(t.due) == self.today]
-        overdue = [
-            t
-            for t in active
-            if _due_date_part(t.due) and _due_date_part(t.due) < self.today
-        ]
-        load = sum(int(t.stima_pomo or 0) for t in planned)
-        cap = int(self.hours / 0.5)
-        yest = self._yesterday()
-        lines = [
-            T("brief_m_sec_today"),
-            self._hero(T("brief_k_plan"), str(len(planned))),
-            self._hero(T("brief_k_due"), str(len(due))),
-            self._hero(T("brief_k_over"), str(len(overdue))),
-            "  " + T("brief_m_load", s=load, c=cap, h=int(self.hours)),
-            "  " + T("brief_m_yest", d=len(self._done_on(yest)), p=self._pomo_on(yest)),
-        ]
-        streak = self._streak(self._by_date())
-        # Le chiavi stats_serie* hanno uno spazio iniziale incorporato (serve
-        # alla stats): qui lo togliamo per allinearci alle altre righe.
-        streak_txt = (
-            T("stats_serie", n=streak) if streak else T("stats_serie_off")
-        ).lstrip()
-        lines.append("  " + streak_txt)
-        top = [
-            (t_id, reasons)
-            for t_id, _s, reasons in plan_day(
-                active, today=self.today, hours=self.hours
-            )
-            if not any(k in ("plan_cut", "plan_skipped") for k, _p in reasons)
-        ][:5]
-        if top:
-            lines.append(T("brief_m_sec_top"))
-            by_id = {t.id: t for t in active}
-            for t_id, reasons in top:
-                t = by_id.get(t_id)
-                title = t.title if t else f"#{t_id}"
-                lines.append(f"  • {title}")
-                why = ", ".join(T(k, **p) for k, p in reasons)
-                if why:
-                    lines.append(f"    [dim]({why})[/]")
-        lines.append(T("brief_m_hint"))
-        return lines
+        return _pomo_on_day(self.all_todos, day)
 
     def _evening_lines(self) -> list[str]:
         done = self._done_on(self.today)
-        left = [t for t in self._active() if t.planned_for == self.today]
+        left = [
+            t
+            for t in self.all_todos
+            if t.state == "attivo" and t.planned_for == self.today
+        ]
         pomo = self._pomo_on(self.today)
         if self.daily_goal > 0:
             filled = min(10, max(0, round(len(done) / self.daily_goal * 10)))
@@ -2944,17 +2978,12 @@ class BriefingScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="brief-box"):
-            key = "brief_e_title" if self.mode == "evening" else "brief_m_title"
             yield Label(
-                f"[b]{T(key, date=_format_date_it(self.today))}[/b]",
+                f"[b]{T('brief_e_title', date=_format_date_it(self.today))}[/b]",
                 id="brief-title",
             )
             with VerticalScroll(id="brief-scroll"):
-                lines = (
-                    self._evening_lines()
-                    if self.mode == "evening"
-                    else self._morning_lines()
-                )
+                lines = self._evening_lines()
                 first = True
                 for line in lines:
                     yield Static(
@@ -2986,21 +3015,17 @@ class BriefingScreen(ModalScreen[None]):
 
     @classmethod
     def _plain(cls, line: str) -> str:
-        tags = "|".join(re.escape(t) for t in cls._STYLE_TAGS)
-        return re.sub(rf"\[({tags})\]", "", line).strip()
+        return _strip_rich_tags(line)
 
     def _print(self) -> None:
-        """Esporta il briefing in Markdown (via callback dell'app)."""
+        """Esporta il resoconto in Markdown (via callback dell'app)."""
         if self.on_print is None:
             return
-        key = "brief_e_title" if self.mode == "evening" else "brief_m_title"
-        lines = (
-            self._evening_lines() if self.mode == "evening" else self._morning_lines()
-        )
-        text = "# " + T(key, date=self.today) + "\n\n"
+        lines = self._evening_lines()
+        text = "# " + T("brief_e_title", date=self.today) + "\n\n"
         text += "\n".join(self._plain(line) for line in lines) + "\n"
         try:
-            path = self.on_print(self.mode, self.today, text)
+            path = self.on_print("evening", self.today, text)
         except Exception as exc:
             self.notify(T("n_exp_err", e=exc), severity="error")
             return

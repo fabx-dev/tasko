@@ -3,7 +3,7 @@
 Tasko trasforma appunti veloci in un piano giornaliero realistico: inserimento in linguaggio naturale, proposta smart al mattino, pomodoro durante il giorno, chiusura serale. Offline, in italiano o inglese, senza account.
 
 ```text
-Segna tutto in secondi (n, linguaggio naturale) → al mattino Briefing + Piano smart (P)
+Segna tutto in secondi (n, linguaggio naturale) → al mattino Buongiorno con proposta da confermare (P)
 → lavora dal Piano giorno con pomodoro (o) → la sera Chiusura giornata (R).
 ```
 

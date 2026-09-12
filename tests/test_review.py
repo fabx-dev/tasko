@@ -104,3 +104,27 @@ def test_review_senza_candidati(tmp_files):
 
 def test_review_in_menu(tmp_files):
     assert "Chiusura giornata" in [t for t, _, _ in m.TaskoMenuProvider.MENU_IT]
+
+
+def test_review_layout_terminale_piccolo(tmp_files):
+    """Cornice fissa: lista 1fr, Chiudi sempre dentro il box."""
+    from textual.widgets import Button
+
+    async def _once(w, h):
+        app = make_app([make_todo(f"T-{i}", todo_id=i) for i in range(1, 12)])
+        async with app.run_test(size=(w, h)) as pilot:
+            await pilot.pause()
+            app.action_open_review()
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "ReviewScreen"
+            box = app.screen.query_one("#rev-box").region
+            btn = app.screen.query_one("#rev-close", Button).region
+            assert btn.y >= box.y and btn.y + btn.height <= box.y + box.height
+            assert btn.x >= box.x and btn.x + btn.width <= box.x + box.width
+
+    async def t():
+        for w, h in ((120, 40), (80, 24), (70, 20)):
+            await _once(w, h)
+
+    run(t())

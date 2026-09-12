@@ -269,14 +269,15 @@ class TodoApp(App):
     #tplp-box, #impcsv-box, #pomo-box, #kb-box, #detail-box, #day-box,
     #calendar-box, #plan-box, #goals-box, #stats-box, #keys-box, #set-box,
     #arc-box, #rst-box, #wel-box, #pw-box, #sec-box, #hea-box, #rev-box,
-    #menu-box, #workflow-box {
+    #menu-box, #workflow-box, #brief-box, #planp-box {
         border: thick $primary;
         background: $surface;
         padding: 1 2;
     }
     #agenda-title, #tpl-title, #tplc-title, #tplp-title, #impcsv-title, #goals-title,
     #keys-title, #set-title, #arc-title, #rst-title, #wel-title,
-    #pw-title, #sec-title, #rev-title, #menu-title, #workflow-title {
+    #pw-title, #sec-title, #rev-title, #menu-title, #workflow-title,
+    #brief-title, #planp-title {
         text-align: center;
         text-style: bold;
         color: $primary;
@@ -291,7 +292,7 @@ class TodoApp(App):
         margin-top: 1;
     }
     #agenda-close, #week-close, #tplp-close, #keys-close, #rst-close, #hea-close,
-    #workflow-close {
+    #workflow-close, #brief-close, #planp-close {
         width: 100%;
         min-width: 16;
         height: 3;
@@ -1033,17 +1034,22 @@ class TodoApp(App):
             self._save_data()
             self._populate_table()
 
-        try:
-            hours = float(self.config.get("day_hours", 6) or 6)
-        except (ValueError, TypeError):
-            hours = 6.0
-        self.push_screen(PlanProposalScreen(self.todos, on_change, hours=hours))
+        def on_print(m: str, day: str, text: str):
+            out_dir = _home() / "Tasko_screenshots"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            path = out_dir / f"tasko_morning_{day.replace('-', '')}.md"
+            path.write_text(text, encoding="utf-8")
+            return path
 
-    def _briefing(self, mode: str) -> None:
         try:
             hours = float(self.config.get("day_hours", 6) or 6)
         except (ValueError, TypeError):
             hours = 6.0
+        self.push_screen(
+            PlanProposalScreen(self.todos, on_change, hours=hours, on_print=on_print)
+        )
+
+    def _briefing_evening(self) -> None:
         try:
             goal = int(self.config.get("daily_goal", 0) or 0)
         except (ValueError, TypeError):
@@ -1056,17 +1062,10 @@ class TodoApp(App):
             path.write_text(text, encoding="utf-8")
             return path
 
-        self.push_screen(
-            BriefingScreen(
-                self.todos, mode=mode, hours=hours, daily_goal=goal, on_print=on_print
-            )
-        )
-
-    def action_briefing_morning(self) -> None:
-        self._briefing("morning")
+        self.push_screen(BriefingScreen(self.todos, daily_goal=goal, on_print=on_print))
 
     def action_briefing_evening(self) -> None:
-        self._briefing("evening")
+        self._briefing_evening()
 
     def action_view_stats(self) -> None:
         self.push_screen(

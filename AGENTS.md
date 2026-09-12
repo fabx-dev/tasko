@@ -21,7 +21,8 @@ pomodoro persistente a cicli, template (creabili, anche da progetto), statistich
 salute progetti, archivio, backup/snapshot zip, import/export CSV + export Markdown +
 export iCal, cifratura Fernet opzionale, onboarding demo, **chiusura giornata**
 (review serale, tasto `R`), inserimento in linguaggio naturale (form `ctrl+l`, CLI add),
-piano smart (tasto `P`), briefing mattina / resoconto sera (solo palette, zero rete).
+buongiorno unificato (tasto `P`: contesto di oggi + proposta con motivi da confermare),
+resoconto sera (solo palette, zero rete).
 
 ## 2. Mappa del codice
 
@@ -190,6 +191,16 @@ Regole dure:
 - **Release 0.4.0**: bump `pyproject` 0.3.0 → 0.4.0, CHANGELOG datato 2026-09-12,
   descrizione `pyproject`/README riscritte in tono pratico + installazione in 4 passi
   (pipx consigliato, venv per dev, verifica con `tasko --help`/`list`).
+- **Buongiorno unificato**: briefing mattina + piano smart fusi in un'unica
+  `PlanProposalScreen` (voce `Buongiorno`, tasto `P`): contesto ex briefing
+  (conteggi/carico/ieri/serie) + proposta con motivi inline + stampa `p`;
+  `BriefingScreen` resta solo sera (hint morto `R...` → riga guida onesta
+  `chiudi + R`); `ReviewScreen` al pattern cornice fissa (`#rev-box 90%` +
+  `#rev-list 1fr`) con regression test a 3 taglie; `#brief-*`/`#planp-*`
+  nei gruppi CSS condivisi; chiavi `menu_morning_*`, rimosse `menu_plan_*`,
+  `menu_brief_*`, `brief_m_title/empty/sec_top/hint`;
+  `tests/test_plan_ui.py` (+2), `test_briefing.py` riscritto sera-only,
+  `test_review.py` (+layout piccolo).
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 

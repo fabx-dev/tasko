@@ -172,6 +172,91 @@ def test_conferma_con_s(tmp_files):
     asyncio.run(t())
 
 
+def test_buongiorno_mostra_contesto_motivi_e_stampa(tmp_files, monkeypatch, tmp_path):
+    """Buongiorno (ex briefing mattina + piano smart): contesto, motivi inline,
+    stampa Markdown e cornice che contiene i bottoni."""
+    from pathlib import Path as _P
+
+    from textual.widgets import Button, SelectionList
+
+    from src.lang import T as _T
+    from src.screens import _hero_row as _hero
+
+    monkeypatch.setenv("TASKO_HOME", str(tmp_path / "home"))
+
+    async def t():
+        todos = [
+            make_todo(
+                "P-piano",
+                todo_id=1,
+                planned_for=_day(0),
+                stima_pomo=2,
+            ),
+            make_todo("A-ritardo", todo_id=2, due=_day(-1), priority=Priority.HIGH),
+            make_todo("B-oggi", todo_id=3, due=_day(0)),
+            make_todo(
+                "Y-fatto",
+                todo_id=4,
+                done=True,
+                completed_at=_day(-1) + " 10:00",
+                pomodoro_log=[_day(-1) + " 10:30"],
+            ),
+        ]
+        app = make_app(todos)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.action_plan_day()
+            await pilot.pause()
+            await pilot.pause()
+            assert type(app.screen).__name__ == "PlanProposalScreen"
+            txt = screen_texts(app.screen)
+            # titolo unificato (data formattata) + contesto ex briefing
+            assert _T("menu_morning_t") in txt
+            assert _T("brief_m_sec_today") in txt
+            assert _hero(_T("brief_k_plan"), "1") in txt
+            assert _hero(_T("brief_k_over"), "1") in txt
+            assert _T("brief_m_load", s=2, c=12, h=6) in txt
+            assert _T("brief_m_yest", d=1, p=1) in txt
+            # motivi inline nelle label della proposta
+            labels = " ".join(
+                str(o.prompt)
+                for o in app.screen.query_one("#planp-list", SelectionList)._options
+            )
+            assert _T("plan_overdue") in labels
+            # cornice condivisa: bottoni dentro il box
+            box = app.screen.query_one("#planp-box").region
+            for bid in ("#planp-confirm", "#planp-print", "#planp-close"):
+                r = app.screen.query_one(bid, Button).region
+                assert r.x >= box.x and r.x + r.width <= box.x + box.width
+                assert r.y >= box.y and r.y + r.height <= box.y + box.height
+            # stampa: file Markdown senza markup
+            await pilot.press("p")
+            await pilot.pause()
+            out = _P(str(tmp_path / "home")) / "Tasko_screenshots"
+            files = sorted(out.glob("tasko_morning_*.md"))
+            assert len(files) == 1
+            text = files[0].read_text(encoding="utf-8")
+            assert _T("planp_title", date=_day(0)) in text
+            assert "A-ritardo" in text
+            assert "[b]" not in text and "[dim]" not in text
+
+    asyncio.run(t())
+
+
+def test_buongiorno_prima_voce_giornata(tmp_files):
+    from src.lang import T as _T
+
+    cats = commands_module.menu_categories()
+    day = [c for c in cats if c[0] == _T("menu_cat_day_t")][0]
+    morning = [i for i in day[2] if i[2] == "action_plan_day"][0]
+    assert morning[0] == _T("menu_morning_t")
+    assert morning[3] == "P"
+    assert day[2][0][0] == _T("menu_workflow_t")  # workflow resta prima voce
+    assert "action_briefing_morning" not in [
+        a for _c, _h, items in cats for _t, _hh, a, _s in items
+    ]
+
+
 def test_menu_palette_e_settings_ore(tmp_files):
     names = [action for _t, _h, action in commands_module.TaskoMenuProvider.MENU_IT]
     assert "action_plan_day" in names

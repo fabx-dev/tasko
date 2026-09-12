@@ -13,12 +13,11 @@ MENU_STRUCTURE: tuple = (
         "menu_cat_day_h",
         (
             ("menu_workflow_t", "menu_workflow_h", "action_view_workflow", None),
+            ("menu_morning_t", "menu_morning_h", "action_plan_day", "P"),
             ("menu_agenda_t", "menu_agenda_h", "action_view_agenda", None),
             ("menu_dayplan_t", "menu_dayplan_h", "action_view_daily_plan", "p"),
-            ("menu_plan_t", "menu_plan_h", "action_plan_day", "P"),
             ("menu_week_t", "menu_week_h", "action_view_week", "w"),
             ("menu_cal_t", "menu_cal_h", "action_view_calendar", "c"),
-            ("menu_brief_t", "menu_brief_h", "action_briefing_morning", None),
             ("menu_retro_t", "menu_retro_h", "action_briefing_evening", None),
             ("menu_review_t", "menu_review_h", "action_open_review", "R"),
         ),

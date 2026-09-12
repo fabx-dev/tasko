@@ -3,7 +3,7 @@
 Tasko turns quick notes into a realistic day plan: natural-language capture, a smart morning proposal, pomodoro focus during the day, evening closing. Offline-first, in English or Italian, no account.
 
 ```text
-Capture in seconds (n, natural language) → morning Briefing + Smart plan (P)
+Capture in seconds (n, natural language) → morning briefing with proposal to confirm (P)
 → work from the Day plan with pomodoro (o) → evening Closing (R).
 ```
 

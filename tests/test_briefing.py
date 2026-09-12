@@ -1,4 +1,8 @@
-"""Briefing mattina/sera Sprint 5: composizione dati esistenti (isolati)."""
+"""Resoconto sera: composizione dati esistenti (isolati).
+
+La ex voce mattutina e' confluita in Buongiorno (PlanProposalScreen, tasto P):
+i test della proposta unificata vivono in test_plan_ui.py.
+"""
 
 import asyncio
 from datetime import datetime, timedelta
@@ -24,52 +28,6 @@ def _todos():
             pomodoro_log=[_day(-1) + " 10:30"],
         ),
     ]
-
-
-def test_mattina(tmp_files):
-    async def t():
-        app = make_app(_todos())
-        async with app.run_test(size=(120, 40)) as pilot:
-            await pilot.pause()
-            app.action_briefing_morning()
-            await pilot.pause()
-            await pilot.pause()
-            assert type(app.screen).__name__ == "BriefingScreen"
-            txt = screen_texts(app.screen)
-            from src.screens import BriefingScreen as _B
-
-            assert T("brief_m_sec_today") in txt
-            assert _B._hero(T("brief_k_plan"), "1") in txt
-            assert _B._hero(T("brief_k_due"), "1") in txt
-            assert _B._hero(T("brief_k_over"), "1") in txt
-            assert T("brief_m_load", s=2, c=12, h=6) in txt
-            assert T("brief_m_yest", d=1, p=1) in txt
-            assert "O-ieri" in txt  # top proposta
-            assert T("plan_overdue") in txt  # motivo su riga propria
-            assert "()" not in txt  # niente parentesi vuote
-            assert T("stats_serie", n=1) in txt
-            from textual.widgets import Button, Static
-
-            def _text(w):
-                content = getattr(w, "content", None)
-                if content is None:
-                    content = getattr(w, "renderable", "")
-                return str(content)
-
-            statics = [_text(w) for w in app.screen.query(Static)]
-            streak = [s for s in statics if "Serie" in s or "Streak" in s]
-            assert streak and all(
-                s.startswith("  ") and not s.startswith("   ") for s in streak
-            )
-            box = app.screen.query_one("#brief-box").region
-            btn = app.screen.query_one("#brief-close", Button).region
-            prn = app.screen.query_one("#brief-print", Button).region
-            for r in (btn, prn):
-                assert r.x >= box.x and r.x + r.width <= box.x + box.width
-                assert r.y >= box.y and r.y + r.height <= box.y + box.height
-            assert prn.x + prn.width <= btn.x  # stampa a sinistra, chiudi a destra
-
-    asyncio.run(t())
 
 
 def test_sera(tmp_files):
@@ -107,7 +65,7 @@ def test_sera(tmp_files):
     asyncio.run(t())
 
 
-def test_stampa_mattina(tmp_files, monkeypatch, tmp_path):
+def test_stampa_sera(tmp_files, monkeypatch, tmp_path):
     """Tasto p / bottone Stampa: file Markdown senza markup, id isolati."""
     from pathlib import Path as _P
 
@@ -117,17 +75,17 @@ def test_stampa_mattina(tmp_files, monkeypatch, tmp_path):
         app = make_app(_todos())
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            app.action_briefing_morning()
+            app.action_briefing_evening()
             await pilot.pause()
             await pilot.pause()
             await pilot.press("p")
             await pilot.pause()
             out = _P(str(tmp_path / "home")) / "Tasko_screenshots"
-            files = sorted(out.glob("tasko_briefing_morning_*.md"))
+            files = sorted(out.glob("tasko_briefing_evening_*.md"))
             assert len(files) == 1
             text = files[0].read_text(encoding="utf-8")
-            assert T("brief_m_title", date=_day(0)) in text
-            assert "O-ieri" in text
+            assert T("brief_e_title", date=_day(0)) in text
+            assert "P-piano" in text
             assert "[b]" not in text and "[dim]" not in text
             # i titoli con [] utente resterebbero: nessun tag noto rimasto
             assert "[green]" not in text
@@ -137,18 +95,13 @@ def test_stampa_mattina(tmp_files, monkeypatch, tmp_path):
 
 def test_vuoto_e_menu(tmp_files):
     names = [action for _t, _h, action in commands_module.TaskoMenuProvider.MENU_IT]
-    assert "action_briefing_morning" in names
     assert "action_briefing_evening" in names
+    assert "action_briefing_morning" not in names
+    assert "action_plan_day" in names
 
     async def t():
         app = make_app([])
         async with app.run_test(size=(80, 30)) as pilot:
-            await pilot.pause()
-            app.action_briefing_morning()
-            await pilot.pause()
-            await pilot.pause()
-            assert T("brief_m_empty") in screen_texts(app.screen)
-            await pilot.press("escape")
             await pilot.pause()
             app.action_briefing_evening()
             await pilot.pause()
