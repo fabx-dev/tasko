@@ -77,6 +77,45 @@ def test_modificato_da_entrambi_vince_chi_salva(tmp_files):
     assert [t.title for t in TodoStore.load().all()] == ["B-last"]
 
 
+def test_cancellazione_da_altro_processo_non_viene_risuscitata(tmp_files):
+    s0 = TodoStore([make_todo("X", todo_id=1)])
+    s0.commit()
+    tui = TodoStore.load()
+    deleter = TodoStore.load()
+    deleter.remove_ids({1})
+    deleter.commit()
+    tui.add(make_todo("Nuovo", todo_id=None))
+    tui.commit()
+    assert [t.title for t in TodoStore.load().all()] == ["Nuovo"]
+
+
+def test_cancellato_ma_modificato_da_noi_vince_la_modifica(tmp_files):
+    s0 = TodoStore([make_todo("X", todo_id=1)])
+    s0.commit()
+    tui = TodoStore.load()
+    deleter = TodoStore.load()
+    deleter.remove_ids({1})
+    deleter.commit()
+    tui.by_id(1).title = "X-mod"
+    tui.commit()
+    assert [t.title for t in TodoStore.load().all()] == ["X-mod"]
+
+
+def test_modifica_esterna_compare_in_memoria_e_non_viene_clobberata(tmp_files):
+    s0 = TodoStore([make_todo("X", todo_id=1)])
+    s0.commit()
+    tui = TodoStore.load()
+    cli = TodoStore.load()
+    cli.by_id(1).title = "X-da-CLI"
+    cli.commit()
+    tui.commit()  # commit innocuo: la memoria deve riflettere il merged
+    assert tui.by_id(1).title == "X-da-CLI"
+    tui.by_id(1).notes = "nota tui"
+    tui.commit()
+    back = TodoStore.load().by_id(1)
+    assert back.title == "X-da-CLI" and back.notes == "nota tui"
+
+
 def test_lock_timeout_e_rilascio(tmp_files):
     with storage_mod._locked(m.DATA_FILE, timeout=5):
         with pytest.raises(storage_mod.StorageLocked):

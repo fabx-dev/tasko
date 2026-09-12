@@ -21,15 +21,26 @@ class TodoStore:
     - `_base` e' l'ultimo stato sincronizzato col disco (three-way merge).
     """
 
-    def __init__(self, todos: list[TodoItem] | None = None) -> None:
+    def __init__(
+        self,
+        todos: list[TodoItem] | None = None,
+        *,
+        base: list[dict] | None = None,
+    ) -> None:
         self._todos: list[TodoItem] = list(todos) if todos else []
-        self._base: list[dict] = [t.to_dict() for t in self._todos]
+        # `base` = stato sincronizzato col disco (three-way merge). Se omesso
+        # si rilegge dal disco, così un item non ancora salvato non viene
+        # confuso con uno cancellato da altri processi.
+        self._base: list[dict] = (
+            base if base is not None else [t.to_dict() for t in load_todos()]
+        )
         self._reindex()
 
     @classmethod
     def load(cls) -> "TodoStore":
         """Carica da disco (stessa semantica di `load_todos`)."""
-        return cls(load_todos())
+        todos = load_todos()
+        return cls(todos, base=[t.to_dict() for t in todos])
 
     # -- lettura ------------------------------------------------------
 
@@ -110,15 +121,23 @@ class TodoStore:
             self._by_id.pop(t.id, None)
         return removed
 
-    def replace_all(self, todos: list[TodoItem]) -> None:
-        """Sostituisce l'intero contenuto (demo, reload, restore)."""
+    def replace_all(
+        self, todos: list[TodoItem], *, base: list[dict] | None = None
+    ) -> None:
+        """Sostituisce l'intero contenuto (demo, reload, restore).
+
+        `base` esplicito quando il disco è già stato letto; se omesso si
+        rilegge dal disco così il "replace" è davvero un rimpiazzo e gli
+        item nuovi non vengono confusi con cancellazioni altrui.
+        """
         self._todos[:] = list(todos)
-        self._base = [t.to_dict() for t in self._todos]
+        self._base = base if base is not None else [t.to_dict() for t in load_todos()]
         self._reindex()
 
     def reload(self) -> None:
         """Ricarica da disco, scartando le modifiche non committate."""
-        self.replace_all(load_todos())
+        todos = load_todos()
+        self.replace_all(todos, base=[t.to_dict() for t in todos])
 
     # -- persistenza (unico punto di scrittura) -------------------------
 
@@ -126,8 +145,9 @@ class TodoStore:
         """Merge three-way col disco sotto lock e scrittura atomica.
 
         Dopo il commit la memoria rispecchia il merged (eventuali item
-        aggiunti da altri processi compaiono; i conflitti sullo stesso id
-        si risolvono a nostro favore, vedi `merge_todo_dicts`).
+        aggiunti o modificati da altri processi compaiono; i conflitti
+        sullo stesso id si risolvono a nostro favore, vedi
+        `merge_todo_dicts`).
         """
         current = [t.to_dict() for t in self._todos]
         merged = save_todos_synced(current, self._base)
@@ -136,7 +156,11 @@ class TodoStore:
         reconciled: list[TodoItem] = []
         for d in merged:
             obj = live.get(d.get("id")) if isinstance(d, dict) else None
-            if obj is None or obj.id in seen:
+            if (
+                obj is None
+                or obj.id in seen
+                or (isinstance(d, dict) and d != obj.to_dict())
+            ):
                 try:
                     obj = TodoItem.from_dict(d)
                 except Exception:

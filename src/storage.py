@@ -121,6 +121,29 @@ def _is_locked_no_key(path: Path) -> bool:
         return False
 
 
+def _is_crypto_unreadable(path: Path) -> bool:
+    """True se il file esiste, e' un envelope ma non e' decifrabile con la
+    chiave corrente (errata o assente). Il contenuto non e' interpretabile:
+    il merge non deve trattarlo come 'tutto cancellato' (es. cambio password
+    in corso), ma come disco non leggibile."""
+    if not path.exists():
+        return False
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    try:
+        if not _crypto.is_envelope(text):
+            return False
+    except Exception:
+        return False
+    try:
+        _crypto.unprotect_text(text)
+    except Exception:
+        return True
+    return False
+
+
 def _read_dict_list(path: Path) -> list[dict]:
     """Dict grezzi dal file. Mancante -> []. Corrotto -> backup .corrotto + [].
     Bloccato (cifrato senza chiave) -> [] SENZA backup: non e' corrotto."""
@@ -199,6 +222,7 @@ def merge_todo_dicts(
     - nuovi da entrambi i lati: unione;
     - stesso id modificato da un solo lato: vince quel lato;
     - modificato da entrambi: vinciamo noi (chi salva);
+    - cancellato da un lato con l'altro intonso: resta cancellato;
     - cancellato da un lato ma modificato dall'altro: vince la modifica;
     - stesso id creato da entrambi con contenuti diversi: disco tiene l'id,
       il nostro viene riassegnato.
@@ -214,7 +238,11 @@ def merge_todo_dicts(
         k = disk_by.get(i, _MISSING)
         o = ours_by.get(i, _MISSING)
         if o is not _MISSING and k is _MISSING:
-            merged[i] = o  # nuovo nostro, o cancellato da loro (teniamo il nostro)
+            if b is _MISSING or o != b:
+                merged[i] = (
+                    o  # nuovo nostro, o modificato da noi dopo la loro cancellazione
+                )
+            # else: cancellato da loro con noi intonsi -> resta cancellato
         elif o is _MISSING and k is not _MISSING:
             if b is _MISSING:
                 merged[i] = k  # nuovo loro
@@ -247,10 +275,16 @@ def merge_todo_dicts(
 def save_todos_synced(current: list[dict], base: list[dict]) -> list[dict]:
     """Merge three-way sotto lock unico (lettura+merge+scrittura atomici).
 
-    Ritorna i dict effettivamente scritti (merged)."""
+    Ritorna i dict effettivamente scritti (merged). Se il disco e' cifrato
+    ma non decifrabile con la chiave corrente (es. cambio password in
+    corso), la memoria e' l'unica fonte di verita': si riscrive com'e',
+    senza merge (l'eventuale file precedente resta in `.bak.json`)."""
     with _locked(DATA_FILE):
-        disk = _read_dict_list(DATA_FILE)
-        merged = merge_todo_dicts(base, disk, current)
+        if _is_crypto_unreadable(DATA_FILE):
+            merged = current
+        else:
+            disk = _read_dict_list(DATA_FILE)
+            merged = merge_todo_dicts(base, disk, current)
         _write_locked(DATA_FILE, _dump_state_text(merged), with_bak=True)
         return merged
 

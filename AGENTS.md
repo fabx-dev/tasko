@@ -63,7 +63,11 @@ Regole dure:
 - `store.commit()` = lettura+merge+scrittura sotto **un solo lock** (`save_todos_synced`).
   Merge three-way per id (`merge_todo_dicts`): nuovi da entrambi i lati in unione, vince chi
   ha modificato, entrambi modificati vince chi salva, cancellato-vs-modificato vince la
-  modifica, stesso id creato da entrambi → disco tiene l'id, nostro riassegnato.
+  modifica (cancellato da un lato con l'altro intonso → resta cancellato), stesso id creato
+  da entrambi → disco tiene l'id, nostro riassegnato. Dopo il commit la memoria rispecchia
+  il merged (item esterni compaiono, `_base` è sincronizzato col disco: si riusa l'oggetto
+  live solo se coincide col merged). Disco cifrato non decifrabile con la chiave corrente
+  (cambio password) → `save_todos_synced` riscrive la memoria com'è, senza merge.
 - File cifrato senza chiave in RAM → `[]` **senza** backup `.corrotto` (non è corrotto, è
   blindato). Chiave errata → `[]` + backup. Dopo l'unlock l'app fa `_reload_all()`.
 

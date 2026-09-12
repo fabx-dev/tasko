@@ -52,6 +52,23 @@ def test_save_load_cifrati(tmp_files, locked_down):
     assert m.load_todos() == []
 
 
+def test_cambio_chiave_commit_non_perde_item(tmp_files, locked_down):
+    from src.store import TodoStore
+
+    crypto_mod.set_key(crypto_mod.password_to_key("vecchia"))
+    m.save_todos([make_todo("A", todo_id=1)])
+    s = TodoStore.load()  # chiave corrente ok -> base e memoria = [A]
+    crypto_mod.set_key(crypto_mod.password_to_key("nuova"))
+    # Il disco e' ora illeggibile: il commit deve riscrivere la memoria
+    # autorevole senza merge, non trattarla come "tutto cancellato".
+    s.commit()
+    assert [t.title for t in m.load_todos()] == ["A"]
+    crypto_mod.set_key(None)
+    # senza chiave il file resta un envelope (non e' stato toccato in chiaro)
+    assert not crypto_mod.is_unlocked()
+    assert m.load_todos() == []
+
+
 def test_enable_change_disable(tmp_files, locked_down):
     async def t():
         app = make_app([make_todo("A")])
