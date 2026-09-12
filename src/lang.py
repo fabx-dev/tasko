@@ -488,7 +488,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rev_goal": " (obiettivo {n})",
         "rev_cand": "[b]Domani ({date}): spunta i più importanti[/b]",
         "rev_empty_cand": "[green]Niente da pianificare: nessun task attivo.[/]",
-        "rev_legend": " [b]Space[/] spunta · [b]↑↓[/] muovi · [b]s[/b] conferma · [b]Esc[/b] chiudi",
+        "rev_legend": " [b]Space[/] spunta · [b]↑↓[/] muovi · [b]s[/b] salva · [b]Esc[/b] chiudi",
         "menu_review_t": "Chiusura giornata",
         "menu_review_h": "Riepilogo di oggi e piano di domani",  # Obiettivi
         "menu_morning_t": "Buongiorno",
@@ -1079,7 +1079,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "rev_goal": " (goal {n})",
         "rev_cand": "[b]Tomorrow ({date}): tick the most important[/b]",
         "rev_empty_cand": "[green]Nothing to plan: no active tasks.[/]",
-        "rev_legend": " [b]Space[/] toggle · [b]↑↓[/] move · [b]s[/b] confirm · [b]Esc[/b] close",
+        "rev_legend": " [b]Space[/] toggle · [b]↑↓[/] move · [b]s[/b] save · [b]Esc[/b] close",
         "menu_review_t": "Day closing",
         "menu_review_h": "Today summary and tomorrow plan",
         "menu_morning_t": "Morning",

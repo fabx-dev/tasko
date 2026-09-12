@@ -1034,20 +1034,11 @@ class TodoApp(App):
             self._save_data()
             self._populate_table()
 
-        def on_print(m: str, day: str, text: str):
-            out_dir = _home() / "Tasko_screenshots"
-            out_dir.mkdir(parents=True, exist_ok=True)
-            path = out_dir / f"tasko_morning_{day.replace('-', '')}.md"
-            path.write_text(text, encoding="utf-8")
-            return path
-
         try:
             hours = float(self.config.get("day_hours", 6) or 6)
         except (ValueError, TypeError):
             hours = 6.0
-        self.push_screen(
-            PlanProposalScreen(self.todos, on_change, hours=hours, on_print=on_print)
-        )
+        self.push_screen(PlanProposalScreen(self.todos, on_change, hours=hours))
 
     def _briefing_evening(self) -> None:
         try:

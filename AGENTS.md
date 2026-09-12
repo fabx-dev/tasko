@@ -193,7 +193,8 @@ Regole dure:
   (pipx consigliato, venv per dev, verifica con `tasko --help`/`list`).
 - **Buongiorno unificato**: briefing mattina + piano smart fusi in un'unica
   `PlanProposalScreen` (voce `Buongiorno`, tasto `P`): contesto ex briefing
-  (conteggi/carico/ieri/serie) + proposta con motivi inline + stampa `p`;
+  (conteggi/carico/ieri/serie) + proposta con motivi inline, senza stampa
+  (il piano su disco e' il documento vero); legend `s salva` come il bottone;
   `BriefingScreen` resta solo sera (hint morto `R...` → riga guida onesta
   `chiudi + R`); `ReviewScreen` al pattern cornice fissa (`#rev-box 90%` +
   `#rev-list 1fr`) con regression test a 3 taglie; `#brief-*`/`#planp-*`

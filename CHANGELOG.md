@@ -6,7 +6,7 @@ Entries in English from now on.
 ## [Unreleased]
 
 ### Added
-- Unified morning view ("Buongiorno", key `P`): today context (counts, load, yesterday, streak) plus the smart proposal with inline reasons, confirm and Markdown print in a single screen
+- Unified morning view ("Buongiorno", key `P`): today context (counts, load, yesterday, streak) plus the smart proposal with inline reasons and confirm in a single screen, no print (the plan on disk is the real document)
 
 ### Fixed
 - Removed dead morning briefing / smart plan duplication (single `plan_day` call, no fake `P`/`m` hints in modals)

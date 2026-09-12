@@ -2659,7 +2659,6 @@ class PlanProposalScreen(ModalScreen[None]):
         Binding("escape", "close", "Chiudi"),
         Binding("ctrl+enter", "confirm", "Conferma", show=False),
         Binding("s", "confirm", "Conferma", show=False),
-        Binding("p", "print_plan", "Stampa", show=False),
     ]
 
     def __init__(
@@ -2668,7 +2667,6 @@ class PlanProposalScreen(ModalScreen[None]):
         on_change,
         today: str | None = None,
         hours: float = 6.0,
-        on_print=None,
     ) -> None:
         super().__init__()
         self.all_todos = all_todos
@@ -2678,7 +2676,6 @@ class PlanProposalScreen(ModalScreen[None]):
             self.hours = max(1.0, float(hours))
         except (ValueError, TypeError):
             self.hours = 6.0
-        self.on_print = on_print
         self.plan = plan_day(self.all_todos, today=self.today, hours=self.hours)
         # Semantica additiva: i gia' pianificati non si ripropongono (per
         # togliere c'e' il piano giorno con x). Restano nel computo capacita'.
@@ -2795,7 +2792,6 @@ class PlanProposalScreen(ModalScreen[None]):
             yield Static(T("rev_legend"), id="planp-legend")
             with Horizontal(id="planp-buttons"):
                 yield Button(T("form_save"), id="planp-confirm", variant="default")
-                yield Button(T("brief_print"), id="planp-print", variant="default")
                 yield Button(T("form_cancel"), id="planp-close", variant="default")
 
     def on_mount(self) -> None:
@@ -2812,40 +2808,12 @@ class PlanProposalScreen(ModalScreen[None]):
             self.dismiss()
         elif event.button.id == "planp-confirm":
             self._confirm()
-        elif event.button.id == "planp-print":
-            self._print()
 
     def action_close(self) -> None:
         self.dismiss()
 
     def action_confirm(self) -> None:
         self._confirm()
-
-    def action_print_plan(self) -> None:
-        self._print()
-
-    def _print(self) -> None:
-        """Esporta contesto + proposta in Markdown (via callback dell'app)."""
-        if self.on_print is None:
-            return
-        text = "# " + T("planp_title", date=self.today) + "\n\n"
-        body = self._context_lines() + [
-            T(
-                "planp_summary",
-                n=sum(1 for _i, _s, r in self.plan if self._preselected(r)),
-                c=sum(1 for _i, _s, r in self.plan if not self._preselected(r)),
-                h=int(self.hours),
-            )
-        ]
-        for t_id, _score, reasons in self.plan:
-            body.append("  • " + self._option_label(t_id, reasons))
-        text += "\n".join(_strip_rich_tags(line) for line in body) + "\n"
-        try:
-            path = self.on_print("morning", self.today, text)
-        except Exception as exc:
-            self.notify(T("n_exp_err", e=exc), severity="error")
-            return
-        self.notify(T("n_brief_printed", p=path))
 
     def _selected_ids(self) -> set:
         try:

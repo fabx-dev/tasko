@@ -172,17 +172,13 @@ def test_conferma_con_s(tmp_files):
     asyncio.run(t())
 
 
-def test_buongiorno_mostra_contesto_motivi_e_stampa(tmp_files, monkeypatch, tmp_path):
-    """Buongiorno (ex briefing mattina + piano smart): contesto, motivi inline,
-    stampa Markdown e cornice che contiene i bottoni."""
-    from pathlib import Path as _P
-
+def test_buongiorno_mostra_contesto_e_motivi(tmp_files):
+    """Buongiorno unificato: contesto ex briefing, motivi inline,
+    legend con salva e cornice che contiene i bottoni."""
     from textual.widgets import Button, SelectionList
 
     from src.lang import T as _T
     from src.screens import _hero_row as _hero
-
-    monkeypatch.setenv("TASKO_HOME", str(tmp_path / "home"))
 
     async def t():
         todos = [
@@ -223,22 +219,13 @@ def test_buongiorno_mostra_contesto_motivi_e_stampa(tmp_files, monkeypatch, tmp_
                 for o in app.screen.query_one("#planp-list", SelectionList)._options
             )
             assert _T("plan_overdue") in labels
+            assert _T("rev_legend") in txt  # legend: s salva, non conferma
             # cornice condivisa: bottoni dentro il box
             box = app.screen.query_one("#planp-box").region
-            for bid in ("#planp-confirm", "#planp-print", "#planp-close"):
+            for bid in ("#planp-confirm", "#planp-close"):
                 r = app.screen.query_one(bid, Button).region
                 assert r.x >= box.x and r.x + r.width <= box.x + box.width
                 assert r.y >= box.y and r.y + r.height <= box.y + box.height
-            # stampa: file Markdown senza markup
-            await pilot.press("p")
-            await pilot.pause()
-            out = _P(str(tmp_path / "home")) / "Tasko_screenshots"
-            files = sorted(out.glob("tasko_morning_*.md"))
-            assert len(files) == 1
-            text = files[0].read_text(encoding="utf-8")
-            assert _T("planp_title", date=_day(0)) in text
-            assert "A-ritardo" in text
-            assert "[b]" not in text and "[dim]" not in text
 
     asyncio.run(t())
 
