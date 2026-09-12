@@ -182,6 +182,11 @@ Regole dure:
   dal debounce visivo (`-active` 0.2s in `Button._on_click`) — nei test con
   toggle azzerare `active_effect_duration`; dopo i click usare attesa a
   condizione (`_wait_for`) invece di pause fisse (runner CI lenti).
+- **Workflow**: `WorkflowScreen` statica (guida operativa checklist in 5 blocchi:
+  cattura/mattina/giorno/sera/settimana), prima voce di `Giornata`
+  (`action_view_workflow`, nessuno shortcut); chiavi `menu_workflow_*` +
+  `workflow_*` it/en; sezione settimana con rimando esplicito a
+  `Viste e analisi → Obiettivi`; `tests/test_workflow.py`.
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 

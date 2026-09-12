@@ -63,6 +63,7 @@ from src.screens import (
     TodoFormScreen,
     WeekScreen,
     WelcomeScreen,
+    WorkflowScreen,
 )
 from src.storage import (
     FILTER_STATES,
@@ -268,14 +269,14 @@ class TodoApp(App):
     #tplp-box, #impcsv-box, #pomo-box, #kb-box, #detail-box, #day-box,
     #calendar-box, #plan-box, #goals-box, #stats-box, #keys-box, #set-box,
     #arc-box, #rst-box, #wel-box, #pw-box, #sec-box, #hea-box, #rev-box,
-    #menu-box {
+    #menu-box, #workflow-box {
         border: thick $primary;
         background: $surface;
         padding: 1 2;
     }
     #agenda-title, #tpl-title, #tplc-title, #tplp-title, #impcsv-title, #goals-title,
     #keys-title, #set-title, #arc-title, #rst-title, #wel-title,
-    #pw-title, #sec-title, #rev-title, #menu-title {
+    #pw-title, #sec-title, #rev-title, #menu-title, #workflow-title {
         text-align: center;
         text-style: bold;
         color: $primary;
@@ -289,7 +290,8 @@ class TodoApp(App):
         height: 3;
         margin-top: 1;
     }
-    #agenda-close, #week-close, #tplp-close, #keys-close, #rst-close, #hea-close {
+    #agenda-close, #week-close, #tplp-close, #keys-close, #rst-close, #hea-close,
+    #workflow-close {
         width: 100%;
         min-width: 16;
         height: 3;
@@ -988,6 +990,9 @@ class TodoApp(App):
                 self.call_after_refresh(ta.scroll_cursor_visible, animate=False)
         except Exception:
             pass
+
+    def action_view_workflow(self) -> None:
+        self.push_screen(WorkflowScreen())
 
     def action_view_agenda(self) -> None:
         self.push_screen(AgendaScreen(self.todos))

@@ -12,6 +12,7 @@ MENU_STRUCTURE: tuple = (
         "menu_cat_day_t",
         "menu_cat_day_h",
         (
+            ("menu_workflow_t", "menu_workflow_h", "action_view_workflow", None),
             ("menu_agenda_t", "menu_agenda_h", "action_view_agenda", None),
             ("menu_dayplan_t", "menu_dayplan_h", "action_view_daily_plan", "p"),
             ("menu_plan_t", "menu_plan_h", "action_plan_day", "P"),

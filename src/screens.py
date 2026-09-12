@@ -906,6 +906,63 @@ class AgendaScreen(ModalScreen[None]):
         self.dismiss()
 
 
+class WorkflowScreen(ModalScreen[None]):
+    """Guida operativa breve: come usare Tasko nel ciclo quotidiano."""
+
+    CSS = """
+    #workflow-box {
+        width: 86;
+        max-width: 95%;
+        height: 90%;
+        max-height: 90%;
+    }
+    #workflow-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+    #workflow-list {
+        height: 1fr;
+        margin-bottom: 1;
+    }
+    .workflow-head {
+        height: auto;
+        margin-top: 1;
+        margin-bottom: 0;
+    }
+    .workflow-line {
+        height: auto;
+        margin-bottom: 0;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "close", "Chiudi")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="workflow-box"):
+            yield Label(T("workflow_title"), id="workflow-title")
+            with VerticalScroll(id="workflow-list"):
+                yield Label(T("workflow_intro"), classes="workflow-line")
+                for i in range(1, 6):
+                    yield Label(T(f"workflow_s{i}_t"), classes="workflow-head")
+                    yield Static(T(f"workflow_s{i}_b"), classes="workflow-line")
+            yield Button(T("ui_close_esc"), id="workflow-close", variant="default")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#workflow-close", Button).focus()
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "workflow-close":
+            self.dismiss()
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+
 class WeekScreen(ModalScreen[None]):
     """Vista settimana Lun-Dom."""
 
