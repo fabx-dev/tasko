@@ -44,37 +44,66 @@ LOCK_TIMEOUT = 10.0
 
 
 def _locked(path: Path, timeout: float = LOCK_TIMEOUT):
-    """Lock esclusivo inter-processo (fcntl) con timeout.
+    """Lock esclusivo inter-processo con timeout (fcntl su Unix, msvcrt su Windows).
 
-    Il kernel rilascia il lock alla morte del processo: niente lock stali.
+    Il kernel/OS rilascia il lock alla morte del processo: niente lock stali.
     Solleva StorageLocked se scade il timeout.
     """
     import contextlib
-    import fcntl
     import os
     import time
 
+    try:
+        import fcntl  # type: ignore[import-not-found]
+    except ImportError:
+        fcntl = None  # type: ignore[assignment]
+    try:
+        import msvcrt  # type: ignore[import-not-found]
+    except ImportError:
+        msvcrt = None  # type: ignore[assignment]
+
     @contextlib.contextmanager
     def _acquire():
+        if fcntl is None and msvcrt is None:
+            raise OSError("lock inter-processo non supportato su questa piattaforma")
         path.parent.mkdir(parents=True, exist_ok=True)
         lock_path = path.parent / (path.name + ".lock")
-        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_BINARY", 0)
+        fd = os.open(lock_path, flags, 0o644)
         try:
+            if msvcrt is not None and fcntl is None:
+                os.lseek(fd, 0, os.SEEK_SET)
+
+            def _try_lock() -> None:
+                if fcntl is not None:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                else:
+                    assert msvcrt is not None
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+
+            def _unlock() -> None:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    elif msvcrt is not None:
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+
+            # fcntl segnala la contesa con BlockingIOError, msvcrt con OSError.
+            _busy = (BlockingIOError,) if fcntl is not None else (OSError,)
             deadline = time.monotonic() + timeout
             while True:
                 try:
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    _try_lock()
                     break
-                except BlockingIOError:
+                except _busy:
                     if time.monotonic() >= deadline:
                         raise StorageLocked(f"File occupato oltre timeout: {path.name}")
                     time.sleep(0.05)
             yield
         finally:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            except OSError:
-                pass
+            _unlock()
             os.close(fd)
 
     return _acquire()

@@ -20,3 +20,16 @@ jobs:
       - run: ruff format --check src/ tests/
       - run: mypy src/
       - run: python -m pytest tests/ -q --cov=src --cov-report=term-missing --cov-fail-under=75
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check src/ tests/
+      - run: ruff format --check src/ tests/
+      - run: mypy src/
+      - run: python -m pytest tests/ -q
