@@ -29,8 +29,11 @@ resoconto sera (solo palette, zero rete).
 ```
 src/main.py      entry point + re-export compatibilità + init lingua PRIMA degli import
 src/app.py       TodoApp(App): orchestratore (~2570 righe, 166 funzioni) — è la god-class nota
-src/screens.py   33 modali (solo models/storage/lang/nlparse, mai app) — via push_screen+callback;
+src/screens/     package per area (form/views/plan/system/menu + _shared + re-export
+                 in __init__): 34 modali + MenuRow; dipendono solo da models/storage/
+                 lang/nlparse/plan/domain (+ _shared), mai app — via push_screen+callback;
                  MenuScreen a 2 colonne (voci a sx -> sottomenu a dx,
+                 conftest ricarica i sottomoduli in ordine per le stringhe it)
 src/nlparse.py   parser deterministico NL it/en → dict uguale al result di TodoFormScreen;
                  sigilli #tag *progetto !prio ~stima //note, parse_with_found() per merge
 src/plan.py      plan_day() pura: score, capacita' ore/0.5 🍅, motivi (chiave, params)
