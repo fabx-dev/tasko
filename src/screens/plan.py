@@ -173,7 +173,11 @@ class DailyPlanScreen(CloseMixin, ModalScreen[None]):
                             if kind == "overdue"
                             else ""
                         )
-                        row = PlanRow(Label(self._row(t, marker, extra)), task_id=t.id, section=kind)
+                        row = PlanRow(
+                            Label(self._row(t, marker, extra)),
+                            task_id=t.id,
+                            section=kind,
+                        )
                         if found_keep is None and t.id == keep:
                             found_keep = len(children)
                         children.append(row)
