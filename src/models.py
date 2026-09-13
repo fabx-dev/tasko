@@ -173,7 +173,7 @@ class TodoItem:
         self.priority = priority
         self.done = done
         self.paused = paused
-        self.created = created or datetime.now().strftime("%Y-%m-%d %H:%M")
+        self.created = str(created or "")
         self.due = due
         self.notes = notes
         self.parent_id = parent_id

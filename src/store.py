@@ -7,6 +7,8 @@ decide quando salvare: `commit()` e' l'unico punto che scrive su disco
 lock/merge in un solo posto (vedi Sprint 2).
 """
 
+from datetime import datetime
+
 from src.models import TodoItem
 from src.storage import load_todos, save_todos_synced
 
@@ -112,11 +114,14 @@ class TodoStore:
         return nid
 
     def add(self, todo: TodoItem) -> TodoItem:
-        """Aggiunge un item assegnando l'id se manca o collide. Ritorna todo."""
+        """Aggiunge un item assegnando id (se manca o collide) e created
+        (se manca: i nuovi item nascono ora, i caricati da disco lo hanno)."""
         if todo.id is None or todo.id in self._by_id:
             todo.id = self.allocate_id()
         else:
             self._next_id = max(self._next_id, todo.id + 1)
+        if not todo.created:
+            todo.created = datetime.now().strftime("%Y-%m-%d %H:%M")
         self._todos.append(todo)
         self._by_id[todo.id] = todo
         return todo

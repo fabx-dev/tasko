@@ -81,6 +81,22 @@ def test_parent_ciclici_non_bloccano():
     ]  # termina, niente ricorsione infinita
 
 
+def test_created_mancante_non_viene_inventato(tmp_files):
+    import json
+
+    m.DATA_FILE.write_text(json.dumps([{"id": 1, "title": "Legacy"}]))
+    s = TodoStore.load()
+    assert s.by_id(1).created == ""
+    s.commit()  # load+save non deve sporcare i dati storici
+    assert TodoStore.load().by_id(1).created == ""
+
+
+def test_add_assegna_created_ai_nuovi():
+    s = TodoStore()
+    t = s.add(make_todo("N", todo_id=None))
+    assert t.created  # timestamp reale assegnato all'inserimento
+
+
 def test_commit_e_reload_tmp(tmp_files):
     s = TodoStore([make_todo("A", todo_id=1, project="lav")])
     s.commit()
