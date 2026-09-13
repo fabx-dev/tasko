@@ -254,6 +254,16 @@ Regole dure:
     gruppo close full-width — la regola id batte `.btn-row` e allarga il bottone.
   - Aggregatori condivisi: `_completed_by_date`/`_pomodoros_by_date` come helper di
     modulo; Review/Briefing/Stats non reimplementano più streak/done/pomo per giorno.
+- **Refactor Fase 3/4/5 (fatti)**:
+  - `src/domain.py`: transizioni stato+ricorrenza, pomodori, form, piani come funzioni
+    senza I/O/UI (timestamp espliciti); app/screen applicano e persistono via store.
+  - `src/screens/` package per area (form/views/plan/system/menu + _shared, re-export
+    in `__init__`); conftest ricarica i sottomoduli in ordine per le stringhe it.
+  - Dati: `restore_snapshot` con backup preventivo + lock; `descendants`/`depth`
+    resistenti a cicli parent_id; `created` vuoto resta vuoto (lo stampa `store.add`);
+    noid deduplicati in forma canonica nel merge; `_derive` in cache LRU;
+    `password_to_key` → `encode_password`; scrittura semplice solo `_save_todos_plain`
+    (seed/test, mai produzione).
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 
