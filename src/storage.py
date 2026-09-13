@@ -76,7 +76,8 @@ def _locked(path: Path, timeout: float = LOCK_TIMEOUT):
 
             def _try_lock() -> None:
                 if fcntl is not None:
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    # Ramo Unix-only (su Windows fcntl non esiste e non si arriva qui).
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
                 else:
                     assert msvcrt is not None
                     msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
@@ -84,7 +85,7 @@ def _locked(path: Path, timeout: float = LOCK_TIMEOUT):
             def _unlock() -> None:
                 try:
                     if fcntl is not None:
-                        fcntl.flock(fd, fcntl.LOCK_UN)
+                        fcntl.flock(fd, fcntl.LOCK_UN)  # type: ignore[attr-defined]
                     elif msvcrt is not None:
                         msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
                 except OSError:
