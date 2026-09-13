@@ -3,7 +3,7 @@
 Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 Entries in English from now on.
 
-## [Unreleased]
+## [0.5.0] - 2026-09-13
 
 ### Added
 - Unified morning view ("Buongiorno", key `P`): today context (counts, load, yesterday, streak) plus the smart proposal with inline reasons and confirm in a single screen, no print (the plan on disk is the real document)
@@ -11,6 +11,7 @@ Entries in English from now on.
 - Evening report has a "Go to Day closing" bridge button (one click instead of close plus `R`)
 - Evening report distinguishes "nothing planned today" from a cleared plan
 - Day closing explains its overwrite semantics (selection becomes exactly tomorrow plan) and the notification reports removed counts
+- Windows support: inter-process file locking via msvcrt, full test suite running on windows-latest in CI
 
 ### Fixed
 - Evening report print no longer exports the navigation hint and notifies "Resoconto salvato"
@@ -29,6 +30,11 @@ Entries in English from now on.
 - Evening report hint now states the real steps (close, then `R` for day closing)
 - Briefing and smart-plan popups use the shared modal frame; day closing uses the fixed-frame pattern (list no longer overflows on small terminals)
 - Buongiorno proposal labels no longer show internal `#id` and omit empty `()` so reasons are not cut off by the terminal width
+- Concurrent edits are no longer lost: deletions made by another process (e.g. CLI while the TUI is open) stay deleted, and external changes appear in memory instead of being silently overwritten on the next commit
+- Clearing all filters also clears the persisted filter state (it no longer comes back after a restart)
+- Legacy items without a creation date keep it empty instead of getting a fake "now" timestamp on every save
+- Legacy items without an id no longer duplicate on every commit
+- Restoring a snapshot first saves the current state as a rollback backup and writes under lock
 
 ### Removed
 - Morning-only briefing keys and menu entries (`menu_plan_*`, `menu_brief_*`, `brief_m_title/empty/sec_top/hint`)
