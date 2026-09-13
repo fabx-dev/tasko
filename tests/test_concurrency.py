@@ -89,6 +89,17 @@ def test_cancellazione_da_altro_processo_non_viene_risuscitata(tmp_files):
     assert [t.title for t in TodoStore.load().all()] == ["Nuovo"]
 
 
+def test_item_senza_id_non_duplicati_dal_merge(tmp_files):
+    import json
+
+    import src.main as m
+
+    m.DATA_FILE.write_text(json.dumps([{"title": "L1"}, {"title": "L2"}]))
+    s = TodoStore.load()
+    s.commit()
+    assert [t.title for t in TodoStore.load().all()] == ["L1", "L2"]
+
+
 def test_cancellato_ma_modificato_da_noi_vince_la_modifica(tmp_files):
     s0 = TodoStore([make_todo("X", todo_id=1)])
     s0.commit()

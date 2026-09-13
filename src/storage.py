@@ -213,6 +213,17 @@ def _dicts_by_id(dicts: list[dict]) -> tuple[dict[int, dict], list[dict]]:
 _MISSING = object()
 
 
+def _noid_key(d: dict) -> dict:
+    """Forma canonica di un item senza id (a meno di normalizzazione from/to_dict):
+    i dict grezzi su disco e quelli espansi in memoria diventano confrontabili."""
+    try:
+        canon = TodoItem.from_dict(d).to_dict()
+        canon.pop("id", None)
+        return canon
+    except Exception:
+        return d
+
+
 def merge_todo_dicts(
     base: list[dict], disk: list[dict], ours: list[dict]
 ) -> list[dict]:
@@ -226,8 +237,10 @@ def merge_todo_dicts(
     - cancellato da un lato ma modificato dall'altro: vince la modifica;
     - stesso id creato da entrambi con contenuti diversi: disco tiene l'id,
       il nostro viene riassegnato.
+    - item senza id: i nostri restano, dal disco solo i davvero nuovi
+      (non gia' visti e non in base).
     """
-    base_by, _ = _dicts_by_id(base)
+    base_by, base_no = _dicts_by_id(base)
     disk_by, disk_no = _dicts_by_id(disk)
     ours_by, ours_no = _dicts_by_id(ours)
     ids = list(ours_by) + [i for i in disk_by if i not in ours_by]
@@ -268,7 +281,13 @@ def merge_todo_dicts(
         # else: cancellato da entrambi -> niente
     out = list(merged.values())
     out.extend(ours_no)
-    out.extend(disk_no)
+    ours_canon = [_noid_key(d) for d in ours_no]
+    base_canon = [_noid_key(d) for d in base_no]
+    out.extend(
+        d
+        for d in disk_no
+        if _noid_key(d) not in ours_canon and _noid_key(d) not in base_canon
+    )
     return out
 
 
