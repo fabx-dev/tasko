@@ -264,6 +264,13 @@ Regole dure:
     noid deduplicati in forma canonica nel merge; `_derive` in cache LRU;
     `password_to_key` → `encode_password`; scrittura semplice solo `_save_todos_plain`
     (seed/test, mai produzione).
+- **Bug-hunting dati (2026-09-13, fatto)**: 7 fix persistenza — ricorrenza eredita
+  `stima_pomo`; `commit()` conta gli scarti in `last_skipped`; merge: figli nostri
+  seguono il padre riassegnato dopo collisione id (input non mutati); backup con
+  letture sotto lock + nomi a microsecondi; restore con validazione JSON upfront,
+  lock per-file, tmp+fsync e rollback; guardrail `test_plain_mai_in_produzione`;
+  lock: test contesa cross-thread. Nota: restore con entry non-JSON ora rifiuta
+  con OSError senza toccare il disco (prima scriveva spazzatura).
 
 ## 8. Decisioni aperte (non implementare senza discuterle)
 
