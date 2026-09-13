@@ -43,7 +43,7 @@ def test_envelope_roundtrip_e_wrong_password(locked_down):
 def test_save_load_cifrati(tmp_files, locked_down):
     crypto_mod.set_key(crypto_mod.encode_password("segreta12"))
     todos = [m.TodoItem(title="Segreto", todo_id=1)]
-    m.save_todos(todos)
+    m._save_todos_plain(todos)
     raw = m.DATA_FILE.read_text(encoding="utf-8")
     assert crypto_mod.is_envelope(raw) and "Segreto" not in raw
     back = m.load_todos()
@@ -56,7 +56,7 @@ def test_cambio_chiave_commit_non_perde_item(tmp_files, locked_down):
     from src.store import TodoStore
 
     crypto_mod.set_key(crypto_mod.encode_password("vecchia"))
-    m.save_todos([make_todo("A", todo_id=1)])
+    m._save_todos_plain([make_todo("A", todo_id=1)])
     s = TodoStore.load()  # chiave corrente ok -> base e memoria = [A]
     crypto_mod.set_key(crypto_mod.encode_password("nuova"))
     # Il disco e' ora illeggibile: il commit deve riscrivere la memoria
@@ -163,7 +163,7 @@ def test_enable_change_disable(tmp_files, locked_down):
 def test_lock_startup_e_backup_cifrato(tmp_files, locked_down):
     # dati cifrati reali su disco (come dopo enable)
     crypto_mod.set_key(crypto_mod.encode_password("segreta12"))
-    m.save_todos([make_todo("A")])
+    m._save_todos_plain([make_todo("A")])
     crypto_mod.set_key(None)
     assert m._needs_unlock()
 

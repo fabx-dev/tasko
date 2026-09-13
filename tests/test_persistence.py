@@ -10,7 +10,7 @@ def test_todos_roundtrip(tmp_files):
         m.TodoItem(title="A", todo_id=1, tags=["x"], project="lav"),
         m.TodoItem(title="B", parent_id=1, todo_id=2, pomodoros=2, stima_pomo=4),
     ]
-    m.save_todos(todos)
+    m._save_todos_plain(todos)
     back = m.load_todos()
     assert [t.title for t in back] == ["A", "B"]
     assert back[1].parent_id == 1 and back[1].stima_pomo == 4

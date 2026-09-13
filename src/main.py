@@ -87,6 +87,7 @@ from src.storage import (
     DATA_FILE,
     POMODORO_FILE,
     TEMPLATE_FILE,
+    _save_todos_plain,
     create_backup,
     list_snapshots,
     load_archive,
@@ -100,7 +101,6 @@ from src.storage import (
     save_config,
     save_pomodoro,
     save_templates,
-    save_todos,
     snapshot_info,
 )
 
@@ -165,7 +165,7 @@ __all__ = [
     "save_config",
     "save_pomodoro",
     "save_templates",
-    "save_todos",
+    "_save_todos_plain",
     "snapshot_info",
     "T",
 ]

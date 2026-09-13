@@ -102,7 +102,7 @@ def test_commit_e_reload_tmp(tmp_files):
     s.commit()
     assert [t.title for t in TodoStore.load().all()] == ["A"]
     # modifica esterna -> reload la vede
-    m.save_todos([make_todo("B", todo_id=2)])
+    m._save_todos_plain([make_todo("B", todo_id=2)])
     s.reload()
     assert [t.title for t in s.all()] == ["B"]
     assert s.next_id == 3

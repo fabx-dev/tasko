@@ -190,8 +190,11 @@ def load_todos() -> list[TodoItem]:
     return todos
 
 
-def save_todos(todos: list[TodoItem]) -> None:
-    """Scrittura semplice sotto lock (nessun merge). Per merge usare lo store."""
+def _save_todos_plain(todos: list[TodoItem]) -> None:
+    """Scrittura semplice sotto lock (nessun merge, nessuna base).
+
+    Solo per seed/test: aggira merge e _base. Il codice di produzione
+    scrive i todos ESCLUSIVAMENTE via TodoStore.commit()."""
     _write_atomic(
         DATA_FILE,
         _dump_state_text([t.to_dict() for t in todos]),

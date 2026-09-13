@@ -137,7 +137,7 @@ def test_lock_timeout_e_rilascio(tmp_files):
 
 
 def test_thread_senza_perdite(tmp_files):
-    m.save_todos([])
+    m._save_todos_plain([])
     errors = []
 
     def worker(n):

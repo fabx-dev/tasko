@@ -31,7 +31,7 @@ def test_store_su_file_corrotto(tmp_files):
 
 def test_envelope_bloccato_niente_backup(tmp_files, unlocked):
     crypto_mod.set_key(crypto_mod.encode_password("segreta12"))
-    m.save_todos([make_todo("Segreto", todo_id=1)])
+    m._save_todos_plain([make_todo("Segreto", todo_id=1)])
     crypto_mod.set_key(None)
     assert m.load_todos() == []
     assert not m.DATA_FILE.with_suffix(".corrotto.json").exists()
@@ -39,7 +39,7 @@ def test_envelope_bloccato_niente_backup(tmp_files, unlocked):
 
 def test_envelope_chiave_errata_backup(tmp_files, unlocked):
     crypto_mod.set_key(crypto_mod.encode_password("segreta12"))
-    m.save_todos([make_todo("Segreto", todo_id=1)])
+    m._save_todos_plain([make_todo("Segreto", todo_id=1)])
     crypto_mod.set_key(crypto_mod.encode_password("sbagliata"))
     assert m.load_todos() == []
     assert m.DATA_FILE.with_suffix(".corrotto.json").exists()
@@ -53,7 +53,7 @@ def _zip_snapshot(path, entries: dict):
 
 
 def test_restore_fa_backup_preventivo(tmp_files):
-    m.save_todos([make_todo("Attuale", todo_id=1)])
+    m._save_todos_plain([make_todo("Attuale", todo_id=1)])
     zpath = m.BACKUP_DIR / "tasko_20990101_000000.zip"
     _zip_snapshot(
         zpath,
@@ -73,7 +73,7 @@ def test_restore_fa_backup_preventivo(tmp_files):
 
 
 def test_snapshot_parziale_ripristina_solo_presenti(tmp_files):
-    m.save_todos([make_todo("A", todo_id=1)])
+    m._save_todos_plain([make_todo("A", todo_id=1)])
     m.save_config({**m.load_config(), "daily_goal": 7})
     zpath = m.BACKUP_DIR / "tasko_20990101_000000.zip"
     _zip_snapshot(
