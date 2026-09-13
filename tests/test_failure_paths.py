@@ -52,6 +52,26 @@ def _zip_snapshot(path, entries: dict):
             zf.writestr(name, content)
 
 
+def test_restore_fa_backup_preventivo(tmp_files):
+    m.save_todos([make_todo("Attuale", todo_id=1)])
+    zpath = m.BACKUP_DIR / "tasko_20990101_000000.zip"
+    _zip_snapshot(
+        zpath,
+        {
+            "todos.json": json.dumps([{"id": 9, "title": "Ripristinato"}]),
+            "manifest.json": json.dumps({"app": "tasko", "created": "x", "files": {}}),
+        },
+    )
+    m.restore_snapshot(zpath)
+    assert [t.title for t in m.load_todos()] == ["Ripristinato"]
+    # lo stato precedente e' conservato in uno snapshot di rollback
+    assert len(m.list_snapshots()) == 2
+    rollback = [p for p in m.list_snapshots() if p.name != "tasko_20990101_000000.zip"]
+    assert len(rollback) == 1
+    with zipfile.ZipFile(rollback[0]) as zf:
+        assert "Attuale" in zf.read("todos.json").decode("utf-8")
+
+
 def test_snapshot_parziale_ripristina_solo_presenti(tmp_files):
     m.save_todos([make_todo("A", todo_id=1)])
     m.save_config({**m.load_config(), "daily_goal": 7})

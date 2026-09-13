@@ -2269,10 +2269,6 @@ class TodoApp(App):
                 if not confirmed:
                     return
                 try:
-                    create_backup()
-                except Exception:
-                    pass
-                try:
                     restore_snapshot(Path(path))
                 except Exception as exc:
                     self.notify(T("n_restore_fail", e=exc), severity="error")

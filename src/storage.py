@@ -558,7 +558,10 @@ def snapshot_info(path: Path) -> dict:
 
 
 def restore_snapshot(path: Path) -> None:
-    """Sostituisce i file di stato con quelli dello snapshot (solo file presenti)."""
+    """Sostituisce i file di stato con quelli dello snapshot (solo file presenti).
+
+    Prima salva lo stato corrente con create_backup (rollback), poi scrive
+    sotto lock esclusivo sui todos: un restore fallito non perde mai dati."""
     import shutil
     import zipfile
 
@@ -571,13 +574,16 @@ def restore_snapshot(path: Path) -> None:
         if bad is not None:
             raise OSError(f"Snapshot danneggiato: {bad}")
         names = set(zf.namelist())
-        for name, dest in _backup_sources():
-            if f"{name}.json" not in names:
-                continue
-            tmp = dest.with_suffix(".restore_tmp")
-            with open(tmp, "wb") as f:
-                f.write(zf.read(f"{name}.json"))
-            shutil.move(str(tmp), str(dest))
+        wanted = [(n, d) for n, d in _backup_sources() if f"{n}.json" in names]
+        if not wanted:
+            return
+        create_backup()  # rollback dello stato corrente
+        with _locked(DATA_FILE):
+            for name, dest in wanted:
+                tmp = dest.with_suffix(".restore_tmp")
+                with open(tmp, "wb") as f:
+                    f.write(zf.read(f"{name}.json"))
+                shutil.move(str(tmp), str(dest))
 
 
 POMODORO_FILE = _home() / ".todo_pomodoro.json"
