@@ -41,6 +41,7 @@ def apply_state(todo: TodoItem, choice: str, now_str: str) -> TodoItem | None:
                 recurrence=todo.recurrence,
                 tags=list(todo.tags),
                 project=todo.project,
+                stima_pomo=todo.stima_pomo,
             )
     return None
 

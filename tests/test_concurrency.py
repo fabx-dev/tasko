@@ -53,6 +53,23 @@ def test_merge_collisione_ids_puro():
     assert by_id[5] == "DISK" and "OURS" in by_id.values() and len(merged) == 2
 
 
+def test_merge_collisione_figlio_segue_padre_nostro():
+    """B3: figlio creato dal nostro lato dopo collisione id segue il padre
+    riassegnato, non quello del disco che ha tenuto l'id."""
+    disk = [{"id": 1, "title": "DISK-P"}]
+    ours = [
+        {"id": 1, "title": "OURS-P"},
+        {"id": 2, "title": "OURS-C", "parent_id": 1},
+    ]
+    merged = storage_mod.merge_todo_dicts([], disk, ours)
+    by_title = {x["title"]: x for x in merged}
+    new_parent = by_title["OURS-P"]["id"]
+    assert new_parent != 1
+    assert by_title["OURS-C"]["parent_id"] == new_parent
+    assert by_title["DISK-P"]["id"] == 1
+    assert ours[1]["parent_id"] == 1  # input non mutato
+
+
 def test_cancellato_da_uno_modificato_dall_altro(tmp_files):
     s0 = TodoStore([make_todo("X", todo_id=1)])
     s0.commit()
@@ -134,6 +151,34 @@ def test_lock_timeout_e_rilascio(tmp_files):
                 pass
     with storage_mod._locked(m.DATA_FILE, timeout=0.2):
         pass
+
+
+def test_lock_contesa_tra_thread(tmp_files):
+    """B7: holder in un altro thread -> StorageLocked, poi acquisibile al rilascio."""
+    import threading
+
+    libero = threading.Event()
+    preso = threading.Event()
+
+    def _holder():
+        with storage_mod._locked(m.DATA_FILE, timeout=5):
+            preso.set()
+            assert libero.wait(timeout=5)
+
+    th = threading.Thread(target=_holder)
+    th.start()
+    try:
+        assert preso.wait(timeout=5)
+        with pytest.raises(storage_mod.StorageLocked):
+            with storage_mod._locked(m.DATA_FILE, timeout=0.15):
+                pass
+    finally:
+        libero.set()
+        th.join()
+    with storage_mod._locked(m.DATA_FILE, timeout=2):
+        pass
+    # il lock usa solo il sidecar: acquisirlo non crea mai il file dati
+    assert not m.DATA_FILE.exists()
 
 
 def test_thread_senza_perdite(tmp_files):

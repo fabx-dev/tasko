@@ -91,6 +91,8 @@ def test_snapshot_parziale_ripristina_solo_presenti(tmp_files):
 
 
 def test_snapshot_con_todos_corrotto(tmp_files):
+    # B5: entry non JSON rifiutata PRIMA di scrivere: OSError, disco intatto.
+    m._save_todos_plain([make_todo("Attuale", todo_id=1)])
     zpath = m.BACKUP_DIR / "tasko_20990101_000000.zip"
     _zip_snapshot(
         zpath,
@@ -99,9 +101,13 @@ def test_snapshot_con_todos_corrotto(tmp_files):
             "manifest.json": json.dumps({"app": "tasko", "created": "x", "files": {}}),
         },
     )
-    m.restore_snapshot(zpath)  # non solleva
-    assert m.load_todos() == []
-    assert m.DATA_FILE.with_suffix(".corrotto.json").exists()
+    try:
+        m.restore_snapshot(zpath)
+    except OSError:
+        pass
+    else:
+        raise AssertionError("doveva fallire")
+    assert [t.title for t in m.load_todos()] == ["Attuale"]
 
 
 def test_merge_con_disco_corrotto(tmp_files):

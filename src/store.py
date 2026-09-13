@@ -37,6 +37,9 @@ class TodoStore:
             base if base is not None else [t.to_dict() for t in load_todos()]
         )
         self._reindex()
+        # Dict scartati dall'ultimo commit perché non parsabili (mai silenti:
+        # vedi commit(); 0 nel caso comune).
+        self.last_skipped = 0
 
     @classmethod
     def load(cls) -> "TodoStore":
@@ -177,7 +180,11 @@ class TodoStore:
         live = {t.id: t for t in self._todos if t.id is not None}
         seen: set[int | None] = set()
         reconciled: list[TodoItem] = []
+        skipped = 0
         for d in merged:
+            if not isinstance(d, dict):
+                skipped += 1
+                continue
             did = d.get("id") if isinstance(d, dict) else None
             obj = live.get(did) if isinstance(did, int) else None
             if (
@@ -188,12 +195,14 @@ class TodoStore:
                 try:
                     obj = TodoItem.from_dict(d)
                 except Exception:
+                    skipped += 1
                     continue
             seen.add(obj.id)
             reconciled.append(obj)
         self._todos[:] = reconciled
         self._reindex()
         self._base = [t.to_dict() for t in self._todos]
+        self.last_skipped = skipped
 
     # -- interni ---------------------------------------------------------
 

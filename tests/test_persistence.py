@@ -3,6 +3,7 @@
 import json
 
 import src.main as m
+from tests.conftest import make_todo
 
 
 def test_todos_roundtrip(tmp_files):
@@ -92,6 +93,103 @@ def test_backup_giro_completo(tmp_files):
     m.DATA_FILE.write_text(json.dumps([{"id": 9, "title": "NUOVO"}]))
     m.restore_snapshot(p)
     assert json.loads(m.DATA_FILE.read_text())[0]["title"] == "A"
+
+
+def test_backup_nomi_unici_e_concorrenti(tmp_files):
+    """B4: backup ravvicinati non si sovrascrivono; sotto commit concorrenti
+    ogni todos.json resta JSON valido."""
+    import json as _json
+    import threading
+    import zipfile
+
+    import src.main as m
+    from src.store import TodoStore
+
+    s = TodoStore.load()
+    s.add(make_todo("A", todo_id=None))
+    s.commit()
+    p1 = m.create_backup()
+    p2 = m.create_backup()
+    assert p1 != p2 and p1.exists() and p2.exists()
+
+    stop = threading.Event()
+
+    def _churn():
+        while not stop.is_set():
+            st = TodoStore.load()
+            st.add(make_todo("X", todo_id=None))
+            try:
+                st.commit()
+            except OSError:
+                pass
+
+    th = threading.Thread(target=_churn)
+    th.start()
+    try:
+        for _ in range(5):
+            m.create_backup()
+    finally:
+        stop.set()
+        th.join()
+    for zp in m.list_snapshots():
+        with zipfile.ZipFile(zp) as zf:
+            if "todos.json" in zf.namelist():
+                _json.loads(zf.read("todos.json"))  # non deve mai essere troncato
+
+
+def test_restore_fallito_lascia_tutto_intatto(tmp_files, monkeypatch):
+    """B5: errore a meta' restore -> file gia' scritti ripristinati, altri mai toccati."""
+    import json as _json
+
+    import src.main as m
+    import src.storage as s
+
+    m.DATA_FILE.write_text(_json.dumps([{"id": 1, "title": "VECCHIO"}]))
+    m.ARCHIVE_FILE.write_text(_json.dumps([{"id": 1, "title": "ARC-VECCHIO"}]))
+    snap = m.create_backup()
+    prima_todos = m.DATA_FILE.read_bytes()
+    prima_arc = m.ARCHIVE_FILE.read_bytes()
+
+    calls = {"n": 0}
+    reale = s._write_bytes_locked
+
+    def _flaky(path, data):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise OSError("crash simulato")
+        return reale(path, data)
+
+    monkeypatch.setattr(s, "_write_bytes_locked", _flaky)
+    try:
+        m.restore_snapshot(snap)
+    except OSError:
+        pass
+    else:
+        raise AssertionError("doveva fallire")
+    assert m.DATA_FILE.read_bytes() == prima_todos
+    assert m.ARCHIVE_FILE.read_bytes() == prima_arc
+
+
+def test_restore_entry_non_json_rifiutata(tmp_files):
+    """B5: zip valido con entry non JSON -> OSError prima di toccare il disco."""
+    import json as _json
+    import zipfile
+
+    import src.main as m
+
+    m.DATA_FILE.write_text(_json.dumps([{"id": 1, "title": "VECCHIO"}]))
+    bad = m.BACKUP_DIR / "tasko_20990101_000000.zip"
+    m.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(bad, "w") as zf:
+        zf.writestr("todos.json", b"binario \xff non json")
+        zf.writestr("manifest.json", "{}")
+    try:
+        m.restore_snapshot(bad)
+    except OSError:
+        pass
+    else:
+        raise AssertionError("doveva fallire")
+    assert _json.loads(m.DATA_FILE.read_text())[0]["title"] == "VECCHIO"
 
 
 def test_backup_corrotto_rifiutato(tmp_files):

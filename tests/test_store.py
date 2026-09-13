@@ -124,6 +124,39 @@ def test_app_save_data_scrive_lo_store(tmp_files):
     assert [t.title for t in m.load_todos()] == ["A", "B"]
 
 
+def test_plain_mai_in_produzione():
+    """B6 guardrail: app/screens/cli scrivono solo via store.commit()."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "src"
+    vietati = []
+    for path in [root / "app.py", root / "cli.py", root / "commands.py"]:
+        if "_save_todos_plain" in path.read_text(encoding="utf-8"):
+            vietati.append(path.name)
+    for path in (root / "screens").glob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        if "_save_todos_plain" in path.read_text(encoding="utf-8"):
+            vietati.append(f"screens/{path.name}")
+    assert vietati == [], f"writer plain in produzione: {vietati}"
+
+
+def test_commit_skipped_visibile_e_non_perde_validi(tmp_files, monkeypatch):
+    """B2: dict non parsabili nel merged contati in last_skipped, validi intatti."""
+    import src.store as store_module
+
+    s = TodoStore([make_todo("A", todo_id=1)], base=[])
+    reali = [t.to_dict() for t in s.all()]
+    monkeypatch.setattr(
+        store_module,
+        "save_todos_synced",
+        lambda current, base: reali + ["spazzatura", {"id": 2, "title": "B"}],
+    )
+    s.commit()
+    assert s.last_skipped == 1
+    assert sorted(t.title for t in s.all()) == ["A", "B"]
+
+
 def test_undo_con_collisione_riassegna(tmp_files):
     import asyncio
 

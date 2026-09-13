@@ -46,6 +46,12 @@ LOCK_TIMEOUT = 10.0
 def _locked(path: Path, timeout: float = LOCK_TIMEOUT):
     """Lock esclusivo inter-processo con timeout (fcntl su Unix, msvcrt su Windows).
 
+    Protocollo: un sidecar `<nome>.lock` per ogni file di stato; ogni
+    scrittura/lettura protetta acquisisce il lock del file che tocca, in
+    sequenza e mai annidati (niente inversioni d'ordine). La mutua
+    esclusione vale tra processi dello STESSO sistema operativo (su Unix
+    flock whole-file, su Windows region-lock di 1 byte sullo stesso
+    sidecar: meccanismi diversi, stessa granularita' per file).
     Il kernel/OS rilascia il lock alla morte del processo: niente lock stali.
     Solleva StorageLocked se scade il timeout.
     """
@@ -224,7 +230,9 @@ def _save_todos_plain(todos: list[TodoItem]) -> None:
     """Scrittura semplice sotto lock (nessun merge, nessuna base).
 
     Solo per seed/test: aggira merge e _base. Il codice di produzione
-    scrive i todos ESCLUSIVAMENTE via TodoStore.commit()."""
+    scrive i todos ESCLUSIVAMENTE via TodoStore.commit() (guardrail:
+    test_plain_mai_in_produzione). Gli store vivi restano coerenti: il
+    prossimo commit() rilegge il disco e fonde (merge three-way)."""
     _write_atomic(
         DATA_FILE,
         _dump_state_text([t.to_dict() for t in todos]),
@@ -276,6 +284,8 @@ def merge_todo_dicts(
     ids = list(ours_by) + [i for i in disk_by if i not in ours_by]
     fresh = max(list(ours_by) + list(disk_by) + list(base_by), default=0) + 1
     merged: dict[int, dict] = {}
+    remap: dict[int, int] = {}  # id collisi (padre nostro) -> nuovo id riassegnato
+    ours_origin: set[int] = set()  # chiavi merged arrivate dal nostro lato
     for i in ids:
         b = base_by.get(i)
         k = disk_by.get(i)
@@ -285,6 +295,7 @@ def merge_todo_dicts(
                 merged[i] = (
                     o  # nuovo nostro, o modificato da noi dopo la loro cancellazione
                 )
+                ours_origin.add(i)
             # else: cancellato da loro con noi intonsi -> resta cancellato
         elif o is None and k is not None:
             if b is None:
@@ -296,19 +307,34 @@ def merge_todo_dicts(
             if b is None:
                 if o == k:
                     merged[i] = o
+                    ours_origin.add(i)
                 else:
                     merged[i] = k  # collisione: disco tiene l'id...
                     d = dict(o)
                     d["id"] = fresh  # ...noi riassegnati
+                    remap[i] = fresh
                     fresh += 1
                     merged[d["id"]] = d
+                    ours_origin.add(d["id"])
             elif o == b:
                 merged[i] = k
             elif k == b:
                 merged[i] = o
+                ours_origin.add(i)
             else:
                 merged[i] = o  # entrambi modificato: vince chi salva
+                ours_origin.add(i)
         # else: cancellato da entrambi -> niente
+    # I figli creati dal nostro lato con parent_id sull'id colliso seguono
+    # il padre riassegnato, non quello del disco che ha tenuto l'id.
+    # (copia prima di ritoccare: i dict d'ingresso non si mutano mai)
+    for mid in ours_origin:
+        entry = merged.get(mid)
+        if isinstance(entry, dict) and entry.get("parent_id") in remap:
+            entry = dict(entry)
+            while entry.get("parent_id") in remap:
+                entry["parent_id"] = remap[entry["parent_id"]]
+            merged[mid] = entry
     out = list(merged.values())
     out.extend(ours_no)
     ours_canon = [_noid_key(d) for d in ours_no]
@@ -553,20 +579,35 @@ def create_backup() -> Path:
     import zipfile
 
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Microsecondi + contatore anti-collisione: due backup nello stesso
+    # istante non devono mai sovrascriversi (ZipFile(out, "w") tronca).
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     out = BACKUP_DIR / f"tasko_{ts}.zip"
+    n = 0
+    while out.exists():
+        n += 1
+        out = BACKUP_DIR / f"tasko_{ts}_{n}.zip"
     counts: dict[str, int] = {}
+    # Lettura di ogni sorgente sotto il suo lock: niente snapshot a meta'
+    # di una scrittura concorrente (torn read), niente lock annidati.
+    snapshots: list[tuple[str, bytes]] = []
+    for name, path in _backup_sources():
+        if not path.exists():
+            continue
+        try:
+            with _locked(path):
+                snapshots.append((name, path.read_bytes()))
+        except OSError:
+            continue  # sparito nel frattempo: snapshot senza quel file
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for name, path in _backup_sources():
-            if path.exists():
-                data = path.read_bytes()
-                zf.writestr(f"{name}.json", data)
-                try:
-                    counts[name] = (
-                        len(json.loads(data)) if name in ("todos", "archive") else 1
-                    )
-                except (json.JSONDecodeError, OSError):
-                    counts[name] = -1
+        for name, data in snapshots:
+            zf.writestr(f"{name}.json", data)
+            try:
+                counts[name] = (
+                    len(json.loads(data)) if name in ("todos", "archive") else 1
+                )
+            except (json.JSONDecodeError, OSError):
+                counts[name] = -1
         zf.writestr("manifest.json", json.dumps(_snapshot_manifest(counts), indent=2))
     # Verifica integrita' subito.
     with zipfile.ZipFile(out) as zf:
@@ -606,12 +647,29 @@ def snapshot_info(path: Path) -> dict:
     return info
 
 
+def _write_bytes_locked(path: Path, data: bytes) -> None:
+    """Scrittura binaria atomica tmp+fsync+replace. Il chiamante detiene il lock."""
+    import os
+    import shutil
+
+    tmp = path.with_suffix(".restore_tmp")
+    with open(tmp, "wb") as f:
+        f.write(data)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    shutil.move(str(tmp), str(path))
+
+
 def restore_snapshot(path: Path) -> None:
     """Sostituisce i file di stato con quelli dello snapshot (solo file presenti).
 
-    Prima salva lo stato corrente con create_backup (rollback), poi scrive
-    sotto lock esclusivo sui todos: un restore fallito non perde mai dati."""
-    import shutil
+    Prima salva lo stato corrente con create_backup (rollback), valida che
+    ogni entry sia JSON e poi scrive ogni file sotto il SUO lock con
+    tmp+fsync+replace: un restore fallito lascia i dest intatti (vecchi
+    contenuti riscritti) e non perde mai dati."""
     import zipfile
 
     try:
@@ -626,13 +684,40 @@ def restore_snapshot(path: Path) -> None:
         wanted = [(n, d) for n, d in _backup_sources() if f"{n}.json" in names]
         if not wanted:
             return
+        payloads = [(name, dest, zf.read(f"{name}.json")) for name, dest in wanted]
+        for name, _dest, raw in payloads:
+            try:
+                json.loads(raw)
+            except ValueError:
+                raise OSError(f"Snapshot danneggiato: {name}.json non e' JSON")
         create_backup()  # rollback dello stato corrente
-        with _locked(DATA_FILE):
-            for name, dest in wanted:
-                tmp = dest.with_suffix(".restore_tmp")
-                with open(tmp, "wb") as f:
-                    f.write(zf.read(f"{name}.json"))
-                shutil.move(str(tmp), str(dest))
+        olds: list[tuple[Path, bytes | None]] = []
+        for _name, dest, _raw in payloads:
+            with _locked(dest):
+                try:
+                    olds.append((dest, dest.read_bytes()))
+                except OSError:
+                    olds.append((dest, None))
+        done: list[tuple[Path, bytes | None]] = []
+        try:
+            for (_name, dest, raw), (_dold, old) in zip(payloads, olds):
+                with _locked(dest):
+                    _write_bytes_locked(dest, raw)
+                done.append((dest, old))
+        except Exception:
+            for dest, old in done:  # rollback dei file gia' sostituiti
+                try:
+                    with _locked(dest):
+                        if old is None:
+                            try:
+                                dest.unlink()
+                            except OSError:
+                                pass
+                        else:
+                            _write_bytes_locked(dest, old)
+                except OSError:
+                    pass
+            raise
 
 
 POMODORO_FILE = _home() / ".todo_pomodoro.json"

@@ -33,6 +33,7 @@ def test_apply_state_completato_con_ricorrenza():
         notes="n",
         priority=Priority.HIGH,
         parent_id=7,
+        stima_pomo=4,
     )
     new = domain.apply_state(t, "completato", "2026-09-12 10:00")
     assert t.done and t.completed_at == "2026-09-12 10:00"
@@ -41,6 +42,7 @@ def test_apply_state_completato_con_ricorrenza():
     assert (new.title, new.project, new.tags, new.notes) == ("X", "casa", ["a"], "n")
     assert new.priority == Priority.HIGH and new.parent_id == 7
     assert new.recurrence == Recurrence.DAILY
+    assert new.stima_pomo == 4  # B1: la ricorrenza eredita la stima
 
 
 def test_apply_state_scelta_invalida():
