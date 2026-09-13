@@ -17,6 +17,12 @@ import src.lang as lang  # noqa: E402
 import src.main as main  # noqa: E402
 import src.models as models  # noqa: E402
 import src.screens as screens  # noqa: E402
+import src.screens._shared as screens_shared  # noqa: E402
+import src.screens.form as screens_form  # noqa: E402
+import src.screens.menu as screens_menu  # noqa: E402
+import src.screens.plan as screens_plan  # noqa: E402
+import src.screens.system as screens_system  # noqa: E402
+import src.screens.views as screens_views  # noqa: E402
 import src.storage as storage  # noqa: E402
 
 
@@ -32,6 +38,12 @@ def _italian_module():
     lang.set_lang("it")
     for mod in (
         storage,
+        screens_shared,
+        screens_form,
+        screens_views,
+        screens_plan,
+        screens_system,
+        screens_menu,
         screens,
         commands_module,
         cli_module,
