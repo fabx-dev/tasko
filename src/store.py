@@ -140,7 +140,8 @@ class TodoStore:
         else:
             self._todos[:] = [t for t in self._todos if t.id not in wanted]
         for t in removed:
-            self._by_id.pop(t.id, None)
+            if t.id is not None:
+                self._by_id.pop(t.id, None)
         return removed
 
     def replace_all(
@@ -177,7 +178,8 @@ class TodoStore:
         seen: set[int | None] = set()
         reconciled: list[TodoItem] = []
         for d in merged:
-            obj = live.get(d.get("id")) if isinstance(d, dict) else None
+            did = d.get("id") if isinstance(d, dict) else None
+            obj = live.get(did) if isinstance(did, int) else None
             if (
                 obj is None
                 or obj.id in seen

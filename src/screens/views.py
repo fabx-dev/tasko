@@ -1,13 +1,14 @@
 """Viste di lettura, template, import, pomodoro, kanban, dettaglio, giorno, calendario. Dipendono solo da models/storage/lang/nlparse/plan/domain (+ _shared). Mai app."""
 
 import calendar
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widgets import (
     Button,
     Input,
@@ -231,7 +232,7 @@ class WeekScreen(CloseMixin, ModalScreen[None]):
 
     BINDINGS = [Binding("escape", "close", "Chiudi")]
 
-    def __init__(self, all_todos: list[TodoItem], monday: "datetime.date") -> None:
+    def __init__(self, all_todos: list[TodoItem], monday: date) -> None:
         super().__init__()
         self.all_todos = all_todos
         self.monday = monday
@@ -610,10 +611,11 @@ class TemplateProjectScreen(ModalScreen[str | None]):
             yield Button(T("ui_close_esc"), id="tplp-close", variant="default")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "tplp-close":
+        bid = event.button.id or ""
+        if bid == "tplp-close":
             self.dismiss(None)
-        elif event.button.id.startswith("tplp-"):
-            self.dismiss(event.button.id[len("tplp-") :])
+        elif bid.startswith("tplp-"):
+            self.dismiss(bid[len("tplp-") :])
 
     def on_mount(self) -> None:
         try:
@@ -696,13 +698,14 @@ class ImportCsvScreen(ModalScreen[str | None]):
         self._submit()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "impcsv-cancel":
+        bid = event.button.id or ""
+        if bid == "impcsv-cancel":
             self.dismiss(None)
-        elif event.button.id == "impcsv-ok":
+        elif bid == "impcsv-ok":
             self._submit()
-        elif (event.button.id or "").startswith("impcsv-"):
+        elif bid.startswith("impcsv-"):
             try:
-                self.dismiss(str(self.files[int(event.button.id[len("impcsv-") :])]))
+                self.dismiss(str(self.files[int(bid[len("impcsv-") :])]))
             except (ValueError, IndexError):
                 pass
 
@@ -789,7 +792,7 @@ class PomodoroScreen(CloseMixin, ModalScreen[None]):
         self.on_stop = on_stop
         self.on_done = on_done
         self.on_set_duration = on_set_duration
-        self._timer = None
+        self._timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="pomo-box"):
@@ -1058,7 +1061,7 @@ class DetailScreen(ModalScreen[str | None]):
         self.todo = todo
         self.all_todos = all_todos
 
-    def _get_subtasks(self, parent_id: int) -> list[TodoItem]:
+    def _get_subtasks(self, parent_id: int | None) -> list[TodoItem]:
         return [t for t in self.all_todos if t.parent_id == parent_id]
 
     def _build_tree(

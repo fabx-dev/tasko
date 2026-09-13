@@ -213,9 +213,6 @@ def _dicts_by_id(dicts: list[dict]) -> tuple[dict[int, dict], list[dict]]:
     return by_id, noids
 
 
-_MISSING = object()
-
-
 def _noid_key(d: dict) -> dict:
     """Forma canonica di un item senza id (a meno di normalizzazione from/to_dict):
     i dict grezzi su disco e quelli espansi in memoria diventano confrontabili."""
@@ -250,23 +247,23 @@ def merge_todo_dicts(
     fresh = max(list(ours_by) + list(disk_by) + list(base_by), default=0) + 1
     merged: dict[int, dict] = {}
     for i in ids:
-        b = base_by.get(i, _MISSING)
-        k = disk_by.get(i, _MISSING)
-        o = ours_by.get(i, _MISSING)
-        if o is not _MISSING and k is _MISSING:
-            if b is _MISSING or o != b:
+        b = base_by.get(i)
+        k = disk_by.get(i)
+        o = ours_by.get(i)
+        if o is not None and k is None:
+            if b is None or o != b:
                 merged[i] = (
                     o  # nuovo nostro, o modificato da noi dopo la loro cancellazione
                 )
             # else: cancellato da loro con noi intonsi -> resta cancellato
-        elif o is _MISSING and k is not _MISSING:
-            if b is _MISSING:
+        elif o is None and k is not None:
+            if b is None:
                 merged[i] = k  # nuovo loro
             elif k != b:
                 merged[i] = k  # cancellato da noi ma modificato da loro
             # else: cancellato da noi, loro intonsi -> resta cancellato
-        elif o is not _MISSING and k is not _MISSING:
-            if b is _MISSING:
+        elif o is not None and k is not None:
+            if b is None:
                 if o == k:
                     merged[i] = o
                 else:

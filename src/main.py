@@ -11,7 +11,11 @@ if __package__ in (None, ""):
 try:
     from src.lang import T, resolve_lang, set_lang
 except ImportError:  # esecuzione come script: python src/main.py
-    from lang import T, resolve_lang, set_lang
+    from lang import (  # type: ignore[import-not-found,no-redef]
+        T,
+        resolve_lang,
+        set_lang,
+    )
 
 
 def _apply_startup_lang() -> str:

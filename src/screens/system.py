@@ -1,6 +1,6 @@
 """Sistema e analisi: goals, stats, tasti, impostazioni, archivio, restore, welcome, lock, password, security, salute. Dipendono solo da models/storage/lang/nlparse/plan/domain (+ _shared). Mai app."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from textual.app import ComposeResult
@@ -178,9 +178,7 @@ class StatsScreen(CloseMixin, ModalScreen[None]):
     def _pomodoros_by_date(self) -> dict[str, int]:
         return _pomodoros_by_date(self.all_todos)
 
-    def _count_in_range(
-        self, start: datetime.date, end: datetime.date, by_date: dict[str, int]
-    ) -> int:
+    def _count_in_range(self, start: date, end: date, by_date: dict[str, int]) -> int:
         count = 0
         d = start
         while d <= end:

@@ -29,6 +29,7 @@ Ambiguità fissate (coperte da test, non negoziabili senza aggiornarli):
 
 import re
 from datetime import datetime, timedelta
+from typing import Any
 
 from src.models import Priority, Recurrence, _normalize_due
 
@@ -240,7 +241,7 @@ def parse_with_found(text: str, lang: str = "it") -> tuple[dict, set[str]]:
     if lang not in ("it", "en"):
         lang = "it"
     today = datetime.now().date()
-    ctx = {"today": today, "wd": _wd_lookup(lang)}
+    ctx: dict[str, Any] = {"today": today, "wd": _wd_lookup(lang)}
     out = {
         "title": "",
         "priority": Priority.MEDIUM,

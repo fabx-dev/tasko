@@ -179,7 +179,7 @@ class MenuScreen(ModalScreen[str | None]):
         return [
             w
             for w in self.query("#menu-bar MenuRow")
-            if (w.id or "").startswith("menu-cat-")
+            if isinstance(w, MenuRow) and (w.id or "").startswith("menu-cat-")
         ]
 
     def _group_visible(self, gi: int) -> bool:
@@ -197,7 +197,7 @@ class MenuScreen(ModalScreen[str | None]):
                 out.extend(
                     w
                     for w in self.query(f"#menu-drop-{gi} MenuRow")
-                    if not w.has_class("hidden")
+                    if isinstance(w, MenuRow) and not w.has_class("hidden")
                 )
             except Exception:
                 pass
@@ -455,9 +455,9 @@ class MenuScreen(ModalScreen[str | None]):
             except ValueError:
                 pos = -1
             if rows:
-                nxt = rows[(pos + 1) % len(rows)]
+                nxt_row = rows[(pos + 1) % len(rows)]
                 try:
-                    nxt.focus()
+                    nxt_row.focus()
                 except Exception:
                     pass
             return

@@ -694,13 +694,13 @@ class TodoApp(App):
             parents = [t for t in parents if self._matches_search(t)]
         return sorted(parents, key=self._sort_key)
 
-    def _get_subtasks(self, parent_id: int) -> list[TodoItem]:
+    def _get_subtasks(self, parent_id: int | None) -> list[TodoItem]:
         return self.store.children(parent_id)
 
     def _get_depth(self, todo: TodoItem) -> int:
         return self.store.depth(todo)
 
-    def _get_all_descendants(self, todo_id: int) -> list[TodoItem]:
+    def _get_all_descendants(self, todo_id: int | None) -> list[TodoItem]:
         return self.store.descendants(todo_id)
 
     def _populate_table(self) -> None:
@@ -866,7 +866,7 @@ class TodoApp(App):
         if descendants:
             msg += T("n_del_sub", n=len(descendants))
 
-        def on_confirm(confirmed: bool) -> None:
+        def on_confirm(confirmed: bool | None) -> None:
             if confirmed:
                 desc_ids = {d.id for d in descendants}
                 removed = self.store.remove_ids({todo.id} | desc_ids)
@@ -1146,7 +1146,7 @@ class TodoApp(App):
             return self.POMO_LONG_MIN * 60
         return self.POMODORO_MIN * 60
 
-    def _start_phase(self, phase: str, task_id: int) -> None:
+    def _start_phase(self, phase: str, task_id: int | None) -> None:
         self.focus_phase = phase
         self.focus_task_id = task_id
         self.focus_total_secs = self._phase_total_secs(phase)
@@ -1359,7 +1359,8 @@ class TodoApp(App):
         if todo is None:
             self._save_pomodoro()
             return
-        phase = session.get("phase") if session.get("phase") in POMO_PHASES else "focus"
+        phase = session.get("phase")
+        phase = phase if isinstance(phase, str) and phase in POMO_PHASES else "focus"
         try:
             total = int(session.get("total_secs") or self._phase_total_secs(phase))
         except (ValueError, TypeError):
@@ -1630,7 +1631,7 @@ class TodoApp(App):
             all_ids |= {d.id for d in self._get_all_descendants(t.id)}
         removed = [t for t in self.todos if t.id in all_ids]
 
-        def on_confirm(confirmed: bool) -> None:
+        def on_confirm(confirmed: bool | None) -> None:
             if not confirmed:
                 return
             try:
@@ -1742,7 +1743,7 @@ class TodoApp(App):
         if name not in self.templates:
             return
 
-        def on_confirm(confirmed: bool) -> None:
+        def on_confirm(confirmed: bool | None) -> None:
             if not confirmed:
                 self._open_template_picker()
                 return
@@ -2048,7 +2049,7 @@ class TodoApp(App):
             msg = T("n_imp_ok", n=imported, f=Path(path).name)
             if skipped:
                 msg += T("n_imp_skip", s=skipped)
-            self.notify(msg, severity="info" if imported else "warning")
+            self.notify(msg, severity="information" if imported else "warning")
 
         self.push_screen(ImportCsvScreen(files[:20]), on_pick)
 
@@ -2142,6 +2143,7 @@ class TodoApp(App):
                 skipped += 1
                 continue
             assert raw is not None
+            nid = self.store.allocate_id()
             todo = TodoItem(
                 title=raw["title"],
                 priority=raw["priority"],
@@ -2155,10 +2157,10 @@ class TodoApp(App):
                 completed_at=raw["completed_at"] if raw["done"] else "",
                 pomodoros=raw["pomodoros"],
                 stima_pomo=raw.get("stima_pomo", 0),
-                todo_id=self.store.allocate_id(),
+                todo_id=nid,
             )
             if raw["old_id"] is not None:
-                id_map[raw["old_id"]] = todo.id
+                id_map[raw["old_id"]] = nid
             pending_parents.append(raw["old_parent"])
             created.append(todo)
         for todo, old_parent in zip(created, pending_parents):
@@ -2265,7 +2267,7 @@ class TodoApp(App):
                 return
             info = snapshot_info(Path(path))
 
-            def on_confirm(confirmed: bool) -> None:
+            def on_confirm(confirmed: bool | None) -> None:
                 if not confirmed:
                     return
                 try:

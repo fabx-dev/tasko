@@ -3,6 +3,8 @@
 import re
 from datetime import datetime, timedelta
 
+from textual.screen import ModalScreen
+
 from src.models import (
     TodoItem,
     _due_date_part,
@@ -114,7 +116,7 @@ def _pomodoros_by_date(todos: list[TodoItem]) -> dict[str, int]:
     return result
 
 
-class CloseMixin:
+class CloseMixin(ModalScreen):
     """Chiusura via escape condivisa (le screen tengono i propri BINDINGS)."""
 
     def action_close(self) -> None:

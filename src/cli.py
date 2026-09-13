@@ -154,41 +154,41 @@ def _cli_main(argv: list[str]) -> int:
 
     if args.cmd == "done":
         store = TodoStore.load()
-        todo = store.by_id(args.id)
-        if todo is None:
+        target = store.by_id(args.id)
+        if target is None:
             err(T("cli_notfound", id=args.id))
             return 1
-        if todo.done:
-            print(todo.id)
+        if target.done:
+            print(target.id)
             return 0
-        todo.done = True
-        todo.paused = False
-        todo.planned_for = ""
-        todo.completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+        target.done = True
+        target.paused = False
+        target.planned_for = ""
+        target.completed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         store.commit()
-        print(todo.id)
+        print(target.id)
         return 0
     todos = load_todos()
-    todo = next((t for t in todos if t.id == args.id), None)
-    if todo is None:
+    target = next((t for t in todos if t.id == args.id), None)
+    if target is None:
         err(T("cli_notfound", id=args.id))
         return 1
     # show
     lines = [
-        f"#{todo.id} {todo.title}",
+        f"#{target.id} {target.title}",
         T(
             "cli_show_line",
-            s=todo.state,
-            p=todo.priority.value,
-            d=todo.due or "-",
+            s=target.state,
+            p=target.priority.value,
+            d=target.due or "-",
         ),
     ]
-    if todo.project:
-        lines.append(T("cli_proj_lab", p=todo.project))
-    if todo.tags:
-        lines.append(T("cli_tags_lab", t=", ".join(todo.tags)))
-    if todo.notes:
-        lines.append(T("cli_notes_lab", n=todo.notes))
-    lines.append(T("cli_pomo_lab", n=todo.pomodoros))
+    if target.project:
+        lines.append(T("cli_proj_lab", p=target.project))
+    if target.tags:
+        lines.append(T("cli_tags_lab", t=", ".join(target.tags)))
+    if target.notes:
+        lines.append(T("cli_notes_lab", n=target.notes))
+    lines.append(T("cli_pomo_lab", n=target.pomodoros))
     print("\n".join(lines))
     return 0

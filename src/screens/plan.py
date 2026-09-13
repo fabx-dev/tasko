@@ -40,6 +40,15 @@ from src.screens._shared import (
 )
 
 
+class PlanRow(ListItem):
+    """Riga del piano con task_id e sezione tipizzati (niente setattr dinamici)."""
+
+    def __init__(self, *args, task_id=None, section: str = "", **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.task_id = task_id
+        self.section = section
+
+
 class DailyPlanScreen(CloseMixin, ModalScreen[None]):
     """Screen showing today's planned tasks with quick add/remove."""
 
@@ -164,9 +173,7 @@ class DailyPlanScreen(CloseMixin, ModalScreen[None]):
                             if kind == "overdue"
                             else ""
                         )
-                        row = ListItem(Label(self._row(t, marker, extra)))
-                        row.task_id = t.id
-                        row.section = kind
+                        row = PlanRow(Label(self._row(t, marker, extra)), task_id=t.id, section=kind)
                         if found_keep is None and t.id == keep:
                             found_keep = len(children)
                         children.append(row)

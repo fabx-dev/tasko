@@ -701,10 +701,11 @@ class ThemeListScreen(ModalScreen[str | None]):
             pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "theme-close":
+        bid = event.button.id or ""
+        if bid == "theme-close":
             self.dismiss(None)
-        elif event.button.id.startswith("theme-"):
-            self.dismiss(event.button.id[len("theme-") :])
+        elif bid.startswith("theme-"):
+            self.dismiss(bid[len("theme-") :])
 
     def _focusables(self) -> list[Button]:
         try:
@@ -719,10 +720,12 @@ class ThemeListScreen(ModalScreen[str | None]):
         items = self._focusables()
         if not items:
             return
-        try:
-            cur = items.index(self.focused)
-        except ValueError:
-            cur = -1 if delta > 0 else 0
+        cur = -1 if delta > 0 else 0
+        if isinstance(self.focused, Button):
+            try:
+                cur = items.index(self.focused)
+            except ValueError:
+                pass
         try:
             items[(cur + delta) % len(items)].focus()
         except Exception:
