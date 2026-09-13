@@ -1081,7 +1081,7 @@ class LockScreen(ModalScreen[bool]):
             self.notify(T("n_lock_bad"), severity="error")
             self.set_timer(1.0, self._reenable)
             return
-        _crypto.set_key(_crypto.password_to_key(password))
+        _crypto.set_key(_crypto.encode_password(password))
         self.dismiss(True)
 
     def _reenable(self) -> None:

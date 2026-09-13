@@ -30,7 +30,7 @@ def test_store_su_file_corrotto(tmp_files):
 
 
 def test_envelope_bloccato_niente_backup(tmp_files, unlocked):
-    crypto_mod.set_key(crypto_mod.password_to_key("segreta12"))
+    crypto_mod.set_key(crypto_mod.encode_password("segreta12"))
     m.save_todos([make_todo("Segreto", todo_id=1)])
     crypto_mod.set_key(None)
     assert m.load_todos() == []
@@ -38,9 +38,9 @@ def test_envelope_bloccato_niente_backup(tmp_files, unlocked):
 
 
 def test_envelope_chiave_errata_backup(tmp_files, unlocked):
-    crypto_mod.set_key(crypto_mod.password_to_key("segreta12"))
+    crypto_mod.set_key(crypto_mod.encode_password("segreta12"))
     m.save_todos([make_todo("Segreto", todo_id=1)])
-    crypto_mod.set_key(crypto_mod.password_to_key("sbagliata"))
+    crypto_mod.set_key(crypto_mod.encode_password("sbagliata"))
     assert m.load_todos() == []
     assert m.DATA_FILE.with_suffix(".corrotto.json").exists()
 

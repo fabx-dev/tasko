@@ -2402,7 +2402,7 @@ class TodoApp(App):
         except Exception as exc:
             self.notify(T("n_bak_fail", e=exc), severity="error")
             return
-        _crypto.set_key(_crypto.password_to_key(new))
+        _crypto.set_key(_crypto.encode_password(new))
         try:
             self._rewrite_all_state()
         except Exception as exc:
@@ -2436,7 +2436,7 @@ class TodoApp(App):
         if new != repeat:
             self.notify(T("n_sec_mismatch"), severity="error")
             return
-        _crypto.set_key(_crypto.password_to_key(new))
+        _crypto.set_key(_crypto.encode_password(new))
         try:
             self._rewrite_all_state()
         except Exception as exc:

@@ -9,6 +9,7 @@ import base64
 import hashlib
 import json
 import secrets
+from functools import lru_cache
 
 MAGIC_V = 1
 KDF_ITERATIONS = 600_000
@@ -43,12 +44,19 @@ def set_key(key: bytes | None) -> None:
     _key = key
 
 
-def password_to_key(password: str) -> bytes:
-    """Rappresentazione opaca della password da tenere in RAM."""
+def encode_password(password: str) -> bytes:
+    """Rappresentazione opaca della password da tenere in RAM.
+
+    Non deriva alcuna chiave (la derivazione PBKDF2 avviene per-file in
+    `_derive`, con salt dedicato)."""
     return password.encode("utf-8")
 
 
+@lru_cache(maxsize=8)
 def _derive(password: str, salt: bytes) -> bytes:
+    """PBKDF2-SHA256 con cache (le chiavi derivate restano in RAM come `_key`,
+    per disegno: mai su disco). La cache evita di ripagare i 600k giri a ogni
+    lettura dello stesso file; le scritture usano salt freschi e derivano sempre."""
     raw = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, KDF_ITERATIONS)
     return base64.urlsafe_b64encode(raw)
 
