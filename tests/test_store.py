@@ -70,6 +70,17 @@ def test_replace_all_reindicizza():
     assert s.next_id == 21
 
 
+def test_parent_ciclici_non_bloccano():
+    a = make_todo("A", todo_id=1, parent_id=2)
+    b = make_todo("B", todo_id=2, parent_id=1)
+    s = TodoStore([a, b])
+    assert s.depth(a) == 1  # si ferma al ciclo, non loop infinito
+    assert sorted(t.id for t in s.descendants(1)) == [
+        1,
+        2,
+    ]  # termina, niente ricorsione infinita
+
+
 def test_commit_e_reload_tmp(tmp_files):
     s = TodoStore([make_todo("A", todo_id=1, project="lav")])
     s.commit()

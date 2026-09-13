@@ -60,17 +60,34 @@ class TodoStore:
         return [t for t in self._todos if t.parent_id == parent_id]
 
     def descendants(self, todo_id: int | None) -> list[TodoItem]:
+        return self._descendants_of(todo_id, set())
+
+    def _descendants_of(
+        self, todo_id: int | None, seen: set[int | None]
+    ) -> list[TodoItem]:
+        # seen rompe i cicli nei parent_id (dati corrotti): senza, ricorsione infinita.
+        if todo_id is not None:
+            if todo_id in seen:
+                return []
+            seen.add(todo_id)
         result: list[TodoItem] = []
         for t in self._todos:
             if t.parent_id == todo_id:
+                if t.id is None:
+                    result.append(t)  # senza id: foglia, non indirizzabile
+                    continue
                 result.append(t)
-                result.extend(self.descendants(t.id))
+                result.extend(self._descendants_of(t.id, seen))
         return result
 
     def depth(self, todo: TodoItem) -> int:
         depth = 0
+        seen: set[int | None] = {todo.id}
         current = todo
         while current.parent_id is not None:
+            if current.parent_id in seen:
+                break  # ciclo nei parent_id: dati corrotti, non ciclare
+            seen.add(current.parent_id)
             parent = self.by_id(current.parent_id)
             if parent is None:
                 break
